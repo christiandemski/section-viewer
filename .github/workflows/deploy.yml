@@ -1,14 +1,14 @@
 name: Deploy
 
-# Lädt die Seite bei jedem Push auf main per FTPS auf den Netcup-Webspace.
+# Lädt die Seite per FTPS auf den Netcup-Webspace. Läuft nur auf Knopfdruck
+# (Actions › Deploy › Run workflow); für automatisches Deployment bei jedem Push
+# unten "push: branches: [main]" unter "on:" ergänzen.
 # Benötigte Secrets (GitHub: Settings › Secrets and variables › Actions):
 #   FTP_SERVER    z. B. hostingXXXXXX.netcup.net
 #   FTP_USERNAME  eigener FTP-Benutzer, dessen Startverzeichnis das Webverzeichnis der Subdomain ist
 #   FTP_PASSWORD  dessen Passwort
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 concurrency:
