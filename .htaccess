@@ -1,0 +1,26 @@
+# Zugangsschutz: am einfachsten im Netcup-Kundenmenü (Plesk) unter
+# "Passwortgeschützte Verzeichnisse" für diese Subdomain einrichten.
+# Dann liegt kein Passwort im Repo und diese Datei braucht keinen Auth-Block.
+#
+# Alternative ohne Plesk: die folgenden Zeilen einkommentieren, den absoluten
+# Serverpfad anpassen und die .htpasswd außerhalb des Webverzeichnisses ablegen.
+#
+# AuthType Basic
+# AuthName "Section Viewer"
+# AuthUserFile /var/www/vhosts/HOSTINGNAME/.htpasswd-sectionviewer
+# Require valid-user
+
+# Versteckte Dateien (.git, .gitignore, .htpasswd ...) nie ausliefern
+RedirectMatch 404 /\.(?!well-known)
+
+# Falls doch einmal Aufzeichnungen im Webverzeichnis landen: nicht ausliefern
+<FilesMatch "\.(fit|gpx)$">
+  Require all denied
+</FilesMatch>
+
+# Nicht in Suchmaschinen aufnehmen
+<IfModule mod_headers.c>
+  Header set X-Robots-Tag "noindex, nofollow"
+</IfModule>
+
+Options -Indexes
