@@ -81,7 +81,7 @@ td button{padding:2px 8px;font-size:12px}
 <body>
 <main>
   <h1>Section Viewer</h1>
-  <p class="sub">Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour – für Einblendungen im Video.</p>
+  <p class="sub">Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten</p>
 
   <div id="drop" class="card">
     <strong>FIT- oder GPX-Dateien hierher ziehen</strong> oder klicken zum Auswählen.<br>
@@ -768,6 +768,9 @@ const fmtKm = (m, dec) => (m / 1000).toLocaleString('de-DE', {minimumFractionDig
 const OV_FIELDS = [
   {id: 'dist', label: 'Distanz', unit: 'km', on: true, val: (r, c) => fmtKm(c.scope === 'stage' ? r.sDist : r.dist, c.dec)},
   {id: 'asc', label: 'Aufstieg', unit: 'hm', on: true, val: (r, c) => nf0.format(c.scope === 'stage' ? r.sAsc : r.asc)},
+  {id: 'moving', label: 'Fahrzeit', unit: 'h', val: (r, c) => fmtDur(r.moving - (c.scope === 'stage' ? state.track.moving[state.stages[r.stage - 1].start] : 0))},
+  {id: 'elapsed', label: 'Gesamtzeit', unit: 'h', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
+  {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: r => fmtClock(r.clock)},
   {id: 'speed', label: 'Tempo', unit: 'km/h', val: r => r.speed == null ? '–' : nf1.format(r.speed * 3.6)},
   {id: 'hr', label: 'Puls', unit: 'bpm', val: r => r.hr == null ? '–' : nf0.format(r.hr)},
   {id: 'grade', label: 'Steigung', unit: '%', val: r => nf0.format(Math.round(r.grade) || 0)},
@@ -791,6 +794,9 @@ function openSansAvailable() {
   const w = f => { ovMeasure.font = '40px ' + f; return ovMeasure.measureText('Rgae0123').width; };
   return w('"Open Sans", monospace') !== w('monospace');
 }
+
+// Summe der Gesamtzeiten aller Etappen vor Etappe si (Nächte dazwischen zählen nicht mit)
+const elapsedBefore = si => state.stages.slice(0, si).reduce((a, s) => a + (s.track.t[s.track.n - 1] - s.track.t[0]) / 1000, 0);
 
 // Steigung in Prozent, gemittelt über 100 m um den Punkt
 function gradeAt(si, sDist) {
@@ -937,7 +943,7 @@ function ovRefresh() {
   // Werte, die die Datei nicht enthält, lassen sich nicht einblenden
   const T = state.track;
   if (T) {
-    const has = {speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
+    const has = {moving: !!T.t, elapsed: !!T.t, clock: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
     for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
     $('ovProfile').disabled = !T.hasEle;
   }
@@ -1106,6 +1112,7 @@ $('reset').addEventListener('click', () => {
   state.stages = [];
   state.manualOrder = false;
   $('custom').value = '';
+  $('ovStart').value = '';
   combine();
   update();
 });
