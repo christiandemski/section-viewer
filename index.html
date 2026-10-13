@@ -18,7 +18,7 @@
 }}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,"Segoe UI",sans-serif}
-main{max-width:1200px;margin:0 auto;padding:24px 16px 64px}
+main{max-width:1700px;margin:0 auto;padding:24px 16px 64px}
 h1{font-size:22px;margin:0}
 .sub{color:var(--ink2);margin:2px 0 20px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
@@ -65,6 +65,7 @@ td.main{font-weight:600}
 tbody tr:hover{background:var(--accent-soft)}
 td button{padding:2px 8px;font-size:12px}
 td.l,th.l{text-align:left}
+td.c,th.c{text-align:center}
 td input[type=text]{width:160px;padding:2px 6px;font-size:13px}
 .ovgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:12px;margin-bottom:6px}
 .ovgrid .wide{grid-column:span 2}
@@ -181,6 +182,7 @@ td input[type=text]{width:160px;padding:2px 6px;font-size:13px}
         <span class="hint" id="ovProg"></span>
       </div>
       <div class="hint">„Alle eigenen Punkte“ erzeugt für jeden Eintrag aus „Eigene Punkte“ eine Sequenz mit den Einstellungen oben, jede in einem eigenen Ordner.</div>
+      <div class="hint">„Kartenhintergrund“ lädt Kartenkacheln von OpenStreetMap; der Kartenserver erfährt dabei den Kartenausschnitt. Die Quellenangabe „© OpenStreetMap“ ist Pflicht: entweder klein in der Karte („© in der Karte“) oder an anderer Stelle im Video, z. B. im Abspann oder in der Beschreibung.</div>
       <div class="hint">In Premiere: ZIP entpacken, „Datei › Importieren“, das erste Bild auswählen und „Bildsequenz“ anhaken. Der Hintergrund ist transparent. Stimmt die Länge nicht, die Framerate über „Ändern › Filmmaterial interpretieren“ auf den Wert oben setzen.</div>
     </div>
   </div>
@@ -632,6 +634,9 @@ const activeCols = () => COLS.filter(c => (!c.multi || multi()) && state.rows.so
 // Ortsnamen je Punkt, auf rund 100 m gerundet gemerkt; eigene Korrekturen überschreiben den abgerufenen Namen
 let places = {};
 try { places = JSON.parse(localStorage.getItem('sectionviewer.places') || '{}'); } catch {}
+// Punkte, deren Ort klein in der Overlay-Karte erscheinen soll
+let marks = {};
+try { marks = JSON.parse(localStorage.getItem('sectionviewer.marks') || '{}'); } catch {}
 const savePlaces = () => { try { localStorage.setItem('sectionviewer.places', JSON.stringify(places)); } catch {} };
 const placeKey = r => r.lat == null ? null : r.lat.toFixed(3) + ',' + r.lon.toFixed(3);
 // Sucht auch in den Nachbarfeldern, damit ein Punkt knapp neben der Rundungsgrenze seinen Namen behält
@@ -652,9 +657,12 @@ function setPlace(key, name, except) {
 }
 
 $('tbody').addEventListener('change', ev => {
-  const key = ev.target.dataset.place;
-  if (!key) return;
-  setPlace(key, ev.target.value.trim(), ev.target);
+  const key = ev.target.dataset.place, mark = ev.target.dataset.mark;
+  if (mark) {
+    if (ev.target.checked) marks[mark] = 1; else delete marks[mark];
+    try { localStorage.setItem('sectionviewer.marks', JSON.stringify(marks)); } catch {}
+  } else if (key) setPlace(key, ev.target.value.trim(), ev.target);
+  else return;
   ovRefresh();
 });
 
@@ -696,10 +704,11 @@ function renderTable() {
   const cols = activeCols();
   const head = c => multi() && c.key === 'elapsed' ? 'Zeit seit Tagesstart' : multi() && (c.key === 'dist' || c.key === 'asc' || c.key === 'desc') ? c.head + ' ges.' : c.head;
   const gps = state.track.hasGps;
-  $('thead').innerHTML = '<tr><th>Punkt</th>' + (gps ? '<th class="l">Ort</th>' : '') + cols.map(c => `<th>${head(c)}</th>`).join('') + '<th></th></tr>';
+  $('thead').innerHTML = '<tr><th>Punkt</th>' + (gps ? '<th class="l">Ort</th><th class="c" title="Ort klein in der Overlay-Karte zeigen">in Karte</th>' : '') + cols.map(c => `<th>${head(c)}</th>`).join('') + '<th></th></tr>';
   $('tbody').innerHTML = state.rows.map((r, i) =>
     `<tr data-i="${i}"><td>${esc(r.label)}</td>` +
-    (gps ? `<td class="l">${placeKey(r) ? `<input type="text" data-place="${placeKey(r)}" value="${esc(placeOf(r))}" autocomplete="off">` : ''}</td>` : '') +
+    (gps ? `<td class="l">${placeKey(r) ? `<input type="text" data-place="${placeKey(r)}" value="${esc(placeOf(r))}" autocomplete="off">` : ''}</td>` +
+      `<td class="c">${placeKey(r) ? `<input type="checkbox" data-mark="${placeKey(r)}"${marks[placeKey(r)] ? ' checked' : ''} title="Ort klein in der Overlay-Karte zeigen">` : ''}</td>` : '') +
     cols.map(c => `<td${c.main ? ' class="main"' : ''}>${r[c.key] == null ? '–' : c.fmt(r[c.key])}</td>`).join('') +
     `<td><button data-copy="${i}" title="${esc(overlayText(r))}">Kopieren</button> <button data-ov="${i}" title="Overlay ab diesem Punkt">Overlay</button></td></tr>`).join('');
 }
@@ -854,8 +863,8 @@ const OV_FIELDS = [
   {id: 'place', label: 'Ort', unit: '', val: (r, c) => c.place},
   {id: 'dist', label: 'Distanz', unit: 'km', on: true, val: (r, c) => fmtKm(c.scope === 'stage' ? r.sDist : r.dist, c.dec)},
   {id: 'asc', label: 'Aufstieg', unit: 'hm', on: true, val: (r, c) => nf0.format(c.scope === 'stage' ? r.sAsc : r.asc)},
-  {id: 'moving', label: 'Fahrzeit', unit: 'h', val: (r, c) => fmtDur(ovMoving(r, c))},
-  {id: 'elapsed', label: 'Gesamtzeit', unit: 'h', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
+  {id: 'moving', label: 'Fahrzeit', unit: 'Std.', val: (r, c) => fmtDur(ovMoving(r, c))},
+  {id: 'elapsed', label: 'Gesamtzeit', unit: 'Std.', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
   {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: (r, c) => (c.clockSec ? fmtClock : fmtClockShort)(r.clock)},
   {id: 'speed', label: 'Tempo', unit: 'km/h', val: r => r.speed == null ? '–' : nf1.format(r.speed * 3.6)},
   // Schnitt über die Fahrzeit; in den ersten Sekunden wäre der Wert noch reines Rauschen
@@ -865,16 +874,16 @@ const OV_FIELDS = [
   {id: 'ele', label: 'Höhe', unit: 'm', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
 ];
 $('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${f.label}</label>`).join('') +
-  '<label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
+  '<label><input type="checkbox" id="ovMap" checked>Karte</label><label><input type="checkbox" id="ovTiles">Kartenhintergrund</label><label><input type="checkbox" id="ovAttr" checked>© in der Karte</label><label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
 
 // Einstellungen merken
-const OV_SAVED = ['ovDur', 'ovFps', 'ovSpeed', 'ovSize', 'ovWeight', 'ovDec', 'ovClock', 'ovScope', 'ovAccent', 'ovProfile', 'ovBox', ...OV_FIELDS.map(f => 'ovf_' + f.id)];
+const OV_SAVED = ['ovDur', 'ovFps', 'ovSpeed', 'ovSize', 'ovWeight', 'ovDec', 'ovClock', 'ovScope', 'ovAccent', 'ovMap', 'ovTiles', 'ovAttr', 'ovProfile', 'ovBox', ...OV_FIELDS.map(f => 'ovf_' + f.id)];
 try {
   const saved = JSON.parse(localStorage.getItem('sectionviewer.overlay') || '{}');
   for (const id of OV_SAVED) if (id in saved) $(id)[$(id).type === 'checkbox' ? 'checked' : 'value'] = saved[id];
   // gemerkte Reihenfolge herstellen; neu hinzugekommene Werte stehen dahinter
   const labels = [...$('ovChecks').querySelectorAll('.ovf')], rank = id => { const n = (saved.order || []).indexOf(id); return n < 0 ? 1e9 : n; };
-  labels.sort((a, b) => rank(a.dataset.f) - rank(b.dataset.f)).forEach(el => $('ovChecks').insertBefore(el, $('ovProfile').parentNode));
+  labels.sort((a, b) => rank(a.dataset.f) - rank(b.dataset.f)).forEach(el => $('ovChecks').insertBefore(el, $('ovMap').parentNode));
 } catch {}
 
 // Reihenfolge der Werte durch Ziehen der Häkchen ändern
@@ -938,6 +947,10 @@ function ovSample(c, tau) {
     const i = s.start + p.i, j = Math.min(i + 1, s.start + A.n - 1);
     r = rowAt({i, f: p.f}, '');
     if (T.speed[i] != null && T.speed[j] != null) r.speed = T.speed[i] + p.f * (T.speed[j] - T.speed[i]);
+    if (T.lat[i] != null && T.lat[j] != null && T.lon[i] != null && T.lon[j] != null) {
+      r.lat = T.lat[i] + p.f * (T.lat[j] - T.lat[i]);
+      r.lon = T.lon[i] + p.f * (T.lon[j] - T.lon[i]);
+    }
   }
   r.grade = gradeAt(r.stage - 1, r.sDist);
   return r;
@@ -980,18 +993,63 @@ function ovConfig(r0) {
   c.placeW = c.W - 2 * pad - 26 * s;
   c.fontP = `${st}${wght} ${Math.floor(34 * s * Math.min(1, c.placeW / (ovMeasure.measureText(c.place).width || 1)))}px ${OV_FONT}`;
   // Reihenfolge wie die Häkchen; der Ort entfällt, solange kein Name bekannt ist
+  // Nächster Ort: der nächste Tabellenpunkt mit einem anderen Ortsnamen; bekommt eine kleinere Zeile unter dem Ort
+  const nx = c.place && state.rows.find(x => x.dist > r0.dist + 50 && placeOf(x) && placeOf(x) !== c.place);
+  c.next = nx ? {name: placeOf(nx), dist: nx.dist} : null;
+  let rowY = pad;
   c.blocks = [...$('ovChecks').querySelectorAll('.ovf input')].filter(el => el.checked && !el.disabled)
     .map(el => OV_FIELDS.find(f => 'ovf_' + f.id === el.id)).filter(f => f.id !== 'place' || c.place)
-    .map((f, n) => ({f, y: pad + n * rowH + 33 * s}));
+    .map(f => { const b = {f, y: rowY + 33 * s}; rowY += rowH + (f.id === 'place' && c.next ? 28 * s : 0); return b; });
   ovMeasure.font = c.fontU;
   // Einheiten stehen linksbündig in einer eigenen Spalte, die Zahlen rechtsbündig davor
   c.ux = c.W - pad - Math.max(0, ...c.blocks.map(b => ovMeasure.measureText(b.f.unit).width));
-  const blocksH = c.blocks.length * rowH;
+  const blocksH = rowY - pad;
   c.pw = c.profile ? c.W - 2 * pad : 0;
   c.ph = c.profile ? 110 * s : 0;
   c.py = pad + blocksH + (blocksH && c.profile ? 12 * s : 0);
-  c.H = Math.ceil(c.profile ? c.py + c.ph + pad : pad + blocksH + pad * 0.6);
-  c.empty = !c.blocks.length && !c.profile;
+  // bh: Höhe des Kastens; die Karte steht in einem eigenen Kasten darüber und schiebt ihn um oy nach unten
+  c.bh = c.blocks.length || c.profile ? Math.ceil(c.profile ? c.py + c.ph + pad : pad + blocksH + pad * 0.6) : 0;
+  c.map = $('ovMap').checked && T.hasGps;
+  if (c.map) {
+    const st = state.stages[si], stage = c.scope === 'stage';
+    const a = stage ? st.start : 0, b = stage ? st.start + st.track.n - 1 : T.n - 1;
+    const idx = [];
+    for (let i = a; i <= b; i++) if (T.lat[i] != null && T.lon[i] != null) idx.push(i);
+    if (idx.length < 2) c.map = false;
+    else {
+      const stride = Math.max(1, Math.floor(idx.length / 800));
+      const pick = idx.filter((_, n) => n % stride === 0 || n === idx.length - 1);
+      // Web-Mercator (Welt = 0…1), damit der Track auf die Kartenkacheln passt
+      const wx = lon => (lon + 180) / 360;
+      const wy = lat => { const p = lat * Math.PI / 180; return (1 - Math.log(Math.tan(p) + 1 / Math.cos(p)) / Math.PI) / 2; };
+      let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+      for (const i of pick) { const x = wx(T.lon[i]), y = wy(T.lat[i]); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+      const m = 18 * s;
+      const sc = Math.min((c.W - 2 * m) / Math.max(x1 - x0, 1e-9), 220 * s / Math.max(y1 - y0, 1e-9), 256 * 2 ** 17);
+      c.mh = Math.max(Math.ceil((y1 - y0) * sc + 2 * m), 120 * s);
+      const ox = (c.W - (x1 - x0) * sc) / 2, oy = (c.mh - (y1 - y0) * sc) / 2;
+      const at = (lat, lon) => [ox + (wx(lon) - x0) * sc, oy + (wy(lat) - y0) * sc];
+      c.mp = {at, pts: pick.map(i => at(T.lat[i], T.lon[i])), ds: pick.map(i => T.dist[i])};
+      // In der Tabelle angehakte Orte, jeder Name nur einmal
+      const seen = new Set();
+      c.mp.labels = state.rows.filter(x => marks[placeKey(x)] && placeOf(x) && x.dist >= T.dist[a] - 1 && x.dist <= T.dist[b] + 1 && !seen.has(placeOf(x)) && seen.add(placeOf(x)))
+        .map(x => ({name: placeOf(x), p: at(x.lat, x.lon)}));
+      if ($('ovTiles').checked) {
+        // Zoomstufe, bei der eine Kachel möglichst nah an ihrer Originalgröße gezeichnet wird
+        const z = Math.max(0, Math.min(18, Math.round(Math.log2(sc / 256)))), n = 2 ** z;
+        const left = x0 - ox / sc, top = y0 - oy / sc;
+        c.tiles = {
+          z, px: tx => (tx / n - left) * sc, py: ty => (ty / n - top) * sc,
+          tx0: Math.floor(left * n), tx1: Math.floor((left + c.W / sc) * n), ty0: Math.floor(top * n), ty1: Math.floor((top + c.mh / sc) * n),
+        };
+        c.bgKey = [z, left, top, sc, c.W, c.mh].join('|');
+        c.bg = ovBgCache.has(c.bgKey) ? ovBgCache.get(c.bgKey) : null;
+      }
+    }
+  }
+  c.oy = c.map ? c.mh + (c.bh ? 12 * s : 0) : 0;
+  c.H = c.oy + c.bh;
+  c.empty = !c.bh && !c.map;
 
   if (c.profile) {
     const st = state.stages[si], stage = c.scope === 'stage';
@@ -1009,11 +1067,59 @@ function ovConfig(r0) {
   return c;
 }
 
+// Kartenhintergrund: OpenStreetMap-Kacheln, entfärbt, abgedunkelt und blass in den Kasten der Karte gelegt.
+// Wird je Ausschnitt einmal gebaut; false = Kacheln nicht ladbar.
+const ovBgCache = new Map(), ovTileCache = new Map();
+function ovTile(path) {
+  if (!ovTileCache.has(path)) {
+    ovTileCache.set(path, new Promise((res, rej) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous'; // sonst lässt sich die Zeichenfläche nicht mehr als PNG speichern
+      img.onload = () => res(img);
+      img.onerror = () => { ovTileCache.delete(path); rej(new Error('Kachel ' + path)); };
+      img.src = 'https://tile.openstreetmap.org/' + path + '.png';
+    }));
+  }
+  return ovTileCache.get(path);
+}
+// true, wenn dabei ein Hintergrund neu entstanden ist
+async function ovMapBg(c) {
+  if (!c || !c.map || !c.tiles || c.bg !== null) return false;
+  const t = c.tiles, n = 2 ** t.z, jobs = [];
+  const raw = document.createElement('canvas');
+  raw.width = c.W; raw.height = c.mh;
+  const rg = raw.getContext('2d');
+  for (let ty = t.ty0; ty <= t.ty1; ty++) for (let tx = t.tx0; tx <= t.tx1; tx++) {
+    if (ty < 0 || ty >= n) continue;
+    // auf ganze Pixel legen, damit zwischen den Kacheln keine Nähte entstehen
+    const x = Math.round(t.px(tx)), y = Math.round(t.py(ty));
+    jobs.push(ovTile(`${t.z}/${((tx % n) + n) % n}/${ty}`).then(
+      img => { rg.drawImage(img, x, y, Math.round(t.px(tx + 1)) - x, Math.round(t.py(ty + 1)) - y); return 1; }, () => 0));
+  }
+  const ok = (await Promise.all(jobs)).reduce((a, b) => a + b, 0);
+  let bg = false;
+  if (ok) {
+    bg = document.createElement('canvas');
+    bg.width = c.W; bg.height = c.mh;
+    const g = bg.getContext('2d');
+    g.beginPath(); g.roundRect(0, 0, c.W, c.mh, 14 * c.s); g.clip();
+    g.filter = 'grayscale(1) invert(1)';
+    g.globalAlpha = 0.45;
+    g.drawImage(raw, 0, 0);
+  }
+  if (ovBgCache.size > 12) ovBgCache.clear();
+  ovBgCache.set(c.bgKey, bg);
+  c.bg = bg;
+  return true;
+}
+
 // Zeichnet ein Bild; gibt eine Signatur zurück, an der gleiche Bilder erkannt werden
 function ovKey(r, c) {
   const texts = c.blocks.map(b => b.f.val(r, c));
   const mx = c.profile ? Math.round(Math.min(1, Math.max(0, (r.dist - c.prof.d0) / (c.prof.d1 - c.prof.d0 || 1))) * c.pw * 2) / 2 : 0;
-  return {texts, mx, key: texts.join('|') + '|' + mx};
+  const mp = c.map ? (r.lat == null ? c.mp.pts[0] : c.mp.at(r.lat, r.lon)).map(v => Math.round(v * 2) / 2) : [0, 0];
+  const nx = c.next ? nf1.format(Math.max(0, c.next.dist - r.dist) / 1000) : '';
+  return {texts, mx, mp, nx, md: r.dist, key: texts.join('|') + '|' + mx + '|' + mp + '|' + nx};
 }
 
 function ovDraw(canvas, r, c, k = ovKey(r, c)) {
@@ -1021,8 +1127,50 @@ function ovDraw(canvas, r, c, k = ovKey(r, c)) {
   canvas.width = c.W; canvas.height = c.H;
   const g = canvas.getContext('2d');
   const shadow = on => { g.shadowColor = on ? 'rgba(0,0,0,.55)' : 'transparent'; g.shadowBlur = 5 * s; g.shadowOffsetY = s; };
+  if (c.map) {
+    // Karte: ganzer Track in Weiß, der gefahrene Teil in der Akzentfarbe, Punkt an der aktuellen Stelle
+    const {pts, ds} = c.mp, [px, py] = k.mp;
+    if (c.box) {
+      g.beginPath(); g.roundRect(0, 0, c.W, c.mh, 14 * s);
+      g.fillStyle = 'rgba(12,16,20,.55)'; g.fill();
+    }
+    if (c.bg) {
+      g.drawImage(c.bg, 0, 0);
+    }
+    if (c.bg && $('ovAttr').checked) {
+      // Quellenangabe, die OpenStreetMap für die Kartendaten verlangt
+      g.font = c.fontU.replace(/\d+px/, 10 * s + 'px'); g.textAlign = 'right'; g.fillStyle = 'rgba(255,255,255,.6)';
+      g.fillText('© OpenStreetMap', c.W - 8 * s, c.mh - 7 * s);
+    }
+    g.lineWidth = 3 * s; g.lineJoin = g.lineCap = 'round';
+    shadow(true);
+    g.beginPath();
+    pts.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](p[0], p[1]));
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.stroke();
+    shadow(false);
+    g.beginPath(); g.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length && ds[i] <= k.md; i++) g.lineTo(pts[i][0], pts[i][1]);
+    g.lineTo(px, py);
+    g.strokeStyle = c.accent; g.stroke();
+    shadow(true);
+    g.font = c.fontU.replace(/\d+px/, 14 * s + 'px'); g.fillStyle = '#fff';
+    for (const l of c.mp.labels) {
+      g.beginPath(); g.arc(l.p[0], l.p[1], 3.5 * s, 0, Math.PI * 2); g.fill();
+      // Name rechts vom Punkt, am rechten Rand links davon
+      const left = l.p[0] + 8 * s + g.measureText(l.name).width > c.W - 6 * s;
+      g.textAlign = left ? 'right' : 'left';
+      g.fillText(l.name, l.p[0] + (left ? -8 : 8) * s, Math.max(14 * s, Math.min(c.mh - 6 * s, l.p[1] + 5 * s)));
+    }
+    g.beginPath(); g.arc(px, py, 7 * s, 0, Math.PI * 2);
+    g.fillStyle = c.accent; g.fill();
+    g.strokeStyle = '#fff'; g.stroke();
+    g.lineCap = 'butt';
+  }
+  if (!c.bh) return;
+  g.translate(0, c.oy);
+  shadow(false);
   if (c.box) {
-    g.beginPath(); g.roundRect(0, 0, c.W, c.H, 14 * s);
+    g.beginPath(); g.roundRect(0, 0, c.W, c.bh, 14 * s);
     g.fillStyle = 'rgba(12,16,20,.55)'; g.fill();
   }
   shadow(true);
@@ -1037,6 +1185,14 @@ function ovDraw(canvas, r, c, k = ovKey(r, c)) {
       g.fillStyle = c.accent; g.fill('evenodd');
       g.font = c.fontP; g.fillStyle = '#fff';
       g.fillText(k.texts[n], pad + 26 * s, b.y, c.placeW);
+      if (c.next) {
+        // kleiner Pfeil unter dem Ortssymbol, daneben nächster Ort und Entfernung
+        const ay = b.y + 23 * s, ax = pad + 16 * s;
+        g.beginPath(); g.moveTo(pad + 2 * s, ay); g.lineTo(ax, ay); g.moveTo(ax - 5 * s, ay - 5 * s); g.lineTo(ax, ay); g.lineTo(ax - 5 * s, ay + 5 * s);
+        g.strokeStyle = g.fillStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 2 * s; g.stroke();
+        g.font = c.fontL;
+        g.fillText(`${c.next.name} · ${k.nx} km`, pad + 26 * s, b.y + 30 * s, c.placeW);
+      }
       return;
     }
     g.font = c.fontL; g.fillStyle = 'rgba(255,255,255,.85)';
@@ -1090,6 +1246,7 @@ function ovRefresh() {
     const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
     for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
     $('ovProfile').disabled = !T.hasEle;
+    $('ovMap').disabled = $('ovTiles').disabled = $('ovAttr').disabled = !T.hasGps;
   }
   try {
     localStorage.setItem('sectionviewer.overlay', JSON.stringify({
@@ -1103,6 +1260,7 @@ function ovRefresh() {
   place.disabled = !!c.error || !placeKey(c.r0);
   if (place !== document.activeElement) place.value = c.error ? '' : c.place;
   if (!c.error) ovFonts(c).then(fresh => { if (fresh && ov.cfg === c) ovRefresh(); });
+  if (!c.error) ovMapBg(c).then(fresh => { if (fresh && ov.cfg === c) ovRefresh(); });
   const slider = $('ovSlider');
   if (c.error) $('ovInfo').textContent = c.error;
   else if (c.empty) $('ovInfo').textContent = 'Nichts ausgewählt.';
@@ -1113,6 +1271,7 @@ function ovRefresh() {
     $('ovInfo').textContent = `Start bei km ${nf1.format(r.dist / 1000)}` + (multi() ? ` (Tag ${r.stage})` : '') + (r.clock != null ? `, ${fmtClock(r.clock)} Uhr` : '') +
       ` · ${nf0.format(c.frames)} ${c.frames === 1 ? 'Bild' : 'Bilder'} · ${c.W} × ${c.H} px` +
       (!state.track.t ? ' · Datei ohne Zeitangaben: nur Einzelbild möglich' : c.clamped ? ` · auf ${c.dur.toFixed(1).replace('.', ',')} s gekürzt (Etappenende)` : '') +
+      (c.bg === false ? ' · Kartenhintergrund konnte nicht geladen werden' : '') +
       (openSansAvailable() ? '' : ' · Open Sans nicht verfügbar (offline und nicht installiert) – Ersatzschrift wird verwendet');
   }
   ovRender();
@@ -1123,7 +1282,8 @@ async function ovFonts(c) {
   let fresh = false;
   const base = '0123456789 Distanzkm/h%';
   // Der Ortsname kann Zeichen aus einem weiteren Teil der Schrift brauchen (z. B. ł, č)
-  for (const [spec, text] of [[c.fontV, base], [c.fontL, base], [c.fontU, base], ...(c.place ? [[c.fontP, c.place]] : [])]) {
+  for (const [spec, text] of [[c.fontV, base], [c.fontL, base], [c.fontU, base], ...(c.place ? [[c.fontP, c.place]] : []), ...(c.next ? [[c.fontL, c.next.name]] : []),
+    ...(c.map && c.mp.labels.length ? [[c.fontU, c.mp.labels.map(l => l.name).join('')]] : [])]) {
     const id = spec + '|' + text;
     if (ov.fonts.has(id)) continue;
     try { await document.fonts.load(spec, text); } catch {}
@@ -1215,6 +1375,7 @@ async function ovExport(btn, list, zipName) {
   btn.textContent = 'Abbrechen';
   try {
     await ovFonts(list[0].c);
+    for (const x of list) await ovMapBg(x.c);
     const canvas = document.createElement('canvas'), files = [];
     let total = 0;
     for (const [n, {c, base}] of list.entries()) {
