@@ -915,7 +915,7 @@ try {
   });
 }
 
-const ov = {cfg: null, raf: 0, busy: false, cancel: false, fonts: new Set()};
+const ov = {cfg: null, raf: 0, busy: false, cancel: false, fonts: new Set(), zipMax: 2e9};
 const ovMeasure = document.createElement('canvas').getContext('2d');
 const OV_FONT = '"Open Sans", "Segoe UI", system-ui, sans-serif';
 // Open Sans kommt von Google Fonts oder aus den installierten Schriften; sonst greift die Ersatzschrift
@@ -1367,13 +1367,14 @@ function makeZip(files) {
   return new Blob([...parts, ...central, end], {type: 'application/zip'});
 }
 
-// Rendert die Sequenzen aus list ({c, base}) jeweils in einen eigenen Ordner und speichert alles als ein ZIP
+// Rendert die Sequenzen aus list ({c, base}) jeweils in einen eigenen Ordner und speichert alles als ZIP.
+// Ein ZIP ohne ZIP64 fasst höchstens 4 GB und 65.535 Dateien, und alles liegt bis zum Speichern im Arbeitsspeicher;
+// große Exporte werden deshalb auf mehrere ZIP-Dateien verteilt.
 async function ovExport(btn, list, zipName) {
   if (ov.busy) { if (ov.busy === btn) ov.cancel = true; return; }
   const prog = $('ovProg');
-  // 60.000 Bilder insgesamt: mehr Einträge fasst ein ZIP ohne ZIP64 nicht
-  if (list.some(x => x.c.frames > 20000) || list.reduce((a, x) => a + x.c.frames, 0) > 60000) {
-    prog.textContent = 'Zu viele Bilder (maximal 20.000 je Sequenz' + (list.length > 1 ? ', 60.000 insgesamt' : '') + ') – bitte Dauer oder Bilder/s verringern.';
+  if (list.some(x => x.c.frames > 20000)) {
+    prog.textContent = 'Zu viele Bilder (maximal 20.000 je Sequenz) – bitte Dauer oder Bilder/s verringern.';
     return;
   }
   ov.busy = btn; ov.cancel = false;
@@ -1382,9 +1383,19 @@ async function ovExport(btn, list, zipName) {
   try {
     await ovFonts(list[0].c);
     for (const x of list) await ovMapBg(x.c);
-    const canvas = document.createElement('canvas'), files = [];
-    let total = 0;
+    const canvas = document.createElement('canvas'), stem = zipName.replace(/\.zip$/, '');
+    let files = [], total = 0, count = 0, part = 0, parts = 0;
+    const flush = async last => {
+      if (!files.length) return;
+      prog.textContent = 'ZIP wird erstellt …';
+      await new Promise(res => setTimeout(res));
+      parts++;
+      download(makeZip(files), last && parts === 1 ? zipName : `${stem}_teil${parts}.zip`);
+      files = []; part = 0;
+      await new Promise(res => setTimeout(res, 500)); // dem Browser Zeit geben, den Download zu starten
+    };
     for (const [n, {c, base}] of list.entries()) {
+      if (part > ov.zipMax / 2) await flush(); // möglichst zwischen zwei Sequenzen teilen
       const pre = list.length > 1 ? `Punkt ${n + 1} von ${list.length} · ` : '';
       let lastKey = null, bytes = null;
       for (let f = 0; f < c.frames && !ov.cancel; f++) {
@@ -1394,17 +1405,16 @@ async function ovExport(btn, list, zipName) {
           bytes = new Uint8Array(await (await toPng(canvas)).arrayBuffer());
           lastKey = k.key;
         } else if (f % 50 === 0) await new Promise(res => setTimeout(res));
-        total += bytes.length;
-        if (total > 3.5e9) throw new Error('Die Sequenz wird zu groß – bitte Dauer verringern.');
+        if (part + bytes.length > ov.zipMax || files.length >= 60000) await flush();
+        part += bytes.length; total += bytes.length; count++;
         files.push({name: `${base}/${base}_${String(f).padStart(5, '0')}.png`, bytes});
         if (f % 10 === 0) prog.textContent = `${pre}Bild ${f + 1} von ${c.frames} …`;
       }
     }
     if (ov.cancel) { prog.textContent = 'Abgebrochen.'; return; }
-    prog.textContent = 'ZIP wird erstellt …';
-    await new Promise(res => setTimeout(res));
-    download(makeZip(files), zipName);
-    prog.textContent = (list.length > 1 ? `${list.length} Sequenzen, ` : '') + `${nf0.format(files.length)} Bilder gespeichert (${nf0.format(total / 1048576)} MB).`;
+    await flush(true);
+    prog.textContent = (list.length > 1 ? `${list.length} Sequenzen, ` : '') + `${nf0.format(count)} Bilder gespeichert (${nf0.format(total / 1048576)} MB)` +
+      (parts > 1 ? ` in ${parts} ZIP-Dateien – alle in denselben Ordner entpacken.` : '.');
   } catch (e) {
     console.error(e);
     prog.textContent = e.message || 'Export fehlgeschlagen.';
