@@ -1034,6 +1034,14 @@ function ovConfig(r0) {
       const seen = new Set();
       c.mp.labels = state.rows.filter(x => marks[placeKey(x)] && placeOf(x) && x.dist >= T.dist[a] - 1 && x.dist <= T.dist[b] + 1 && !seen.has(placeOf(x)) && seen.add(placeOf(x)))
         .map(x => ({name: placeOf(x), p: at(x.lat, x.lon)}));
+      // Name auf die Seite des Punkts, auf der weniger Track verläuft, damit die Position ihn nicht verdeckt
+      ovMeasure.font = c.fontM = c.fontU.replace(/\d+px/, 14 * s + 'px');
+      for (const l of c.mp.labels) {
+        const w = ovMeasure.measureText(l.name).width + 14 * s;
+        const near = dir => c.mp.pts.filter(q => Math.abs(q[1] - l.p[1]) < 14 * s && (q[0] - l.p[0]) * dir > 2 * s && (q[0] - l.p[0]) * dir < w).length;
+        const fits = dir => dir > 0 ? l.p[0] + w <= c.W - 6 * s : l.p[0] - w >= 6 * s;
+        l.left = !fits(1) || (fits(-1) && near(-1) < near(1));
+      }
       if ($('ovTiles').checked) {
         // Zoomstufe, bei der eine Kachel möglichst nah an ihrer Originalgröße gezeichnet wird
         const z = Math.max(0, Math.min(18, Math.round(Math.log2(sc / 256)))), n = 2 ** z;
@@ -1153,13 +1161,11 @@ function ovDraw(canvas, r, c, k = ovKey(r, c)) {
     g.lineTo(px, py);
     g.strokeStyle = c.accent; g.stroke();
     shadow(true);
-    g.font = c.fontU.replace(/\d+px/, 14 * s + 'px'); g.fillStyle = '#fff';
+    g.font = c.fontM; g.fillStyle = '#fff';
     for (const l of c.mp.labels) {
       g.beginPath(); g.arc(l.p[0], l.p[1], 3.5 * s, 0, Math.PI * 2); g.fill();
-      // Name rechts vom Punkt, am rechten Rand links davon
-      const left = l.p[0] + 8 * s + g.measureText(l.name).width > c.W - 6 * s;
-      g.textAlign = left ? 'right' : 'left';
-      g.fillText(l.name, l.p[0] + (left ? -8 : 8) * s, Math.max(14 * s, Math.min(c.mh - 6 * s, l.p[1] + 5 * s)));
+      g.textAlign = l.left ? 'right' : 'left';
+      g.fillText(l.name, l.p[0] + (l.left ? -14 : 14) * s, Math.max(14 * s, Math.min(c.mh - 6 * s, l.p[1] + 5 * s)));
     }
     g.beginPath(); g.arc(px, py, 7 * s, 0, Math.PI * 2);
     g.fillStyle = c.accent; g.fill();
