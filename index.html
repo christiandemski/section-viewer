@@ -872,6 +872,7 @@ const OV_FIELDS = [
   {id: 'hr', label: 'Puls', unit: 'bpm', val: r => r.hr == null ? '–' : nf0.format(r.hr)},
   {id: 'grade', label: 'Steigung', unit: '%', val: r => nf0.format(Math.round(r.grade) || 0)},
   {id: 'ele', label: 'Höhe', unit: 'm', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
+  {id: 'temp', label: 'Temperatur', unit: '°C', val: r => r.temp == null ? '–' : nf0.format(r.temp)},
 ];
 $('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${f.label}</label>`).join('') +
   '<label><input type="checkbox" id="ovMap" checked>Karte</label><label><input type="checkbox" id="ovTiles">Kartenhintergrund</label><label><input type="checkbox" id="ovAttr" checked>© in der Karte</label><label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
@@ -1249,7 +1250,7 @@ function ovRefresh() {
   // Werte, die die Datei nicht enthält, lassen sich nicht einblenden
   const T = state.track;
   if (T) {
-    const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
+    const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), temp: T.temp.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
     for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
     $('ovProfile').disabled = !T.hasEle;
     $('ovMap').disabled = $('ovTiles').disabled = $('ovAttr').disabled = !T.hasGps;
