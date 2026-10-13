@@ -155,6 +155,7 @@ td button{padding:2px 8px;font-size:12px}
           <option value="c400">Condensed Regular</option><option value="c600">Condensed SemiBold</option><option value="c700">Condensed Bold</option>
         </select></div>
         <div><label for="ovDec">Kilometer</label><select id="ovDec"><option value="2">12,34</option><option value="1">12,3</option></select></div>
+        <div><label for="ovClock">Uhrzeit</label><select id="ovClock"><option value="1">14:35:07</option><option value="0">14:35</option></select></div>
         <div id="ovScopeWrap"><label for="ovScope">Bezug</label><select id="ovScope"><option value="tour">ganze Tour</option><option value="stage">nur dieser Tag</option></select></div>
         <div><label for="ovAccent">Farbe</label><input id="ovAccent" type="color" value="#ff6a1a"></div>
       </div>
@@ -170,8 +171,10 @@ td button{padding:2px 8px;font-size:12px}
       <div class="inline ovbar">
         <button id="ovZip">PNG-Sequenz speichern (ZIP)</button>
         <button id="ovPng">Einzelbild speichern (PNG)</button>
+        <button id="ovAll" title="Je eigenem Punkt eine Sequenz ab diesem Punkt, alle in einem ZIP">Alle eigenen Punkte speichern (ZIP)</button>
         <span class="hint" id="ovProg"></span>
       </div>
+      <div class="hint">„Alle eigenen Punkte“ erzeugt für jeden Eintrag aus „Eigene Punkte“ eine Sequenz mit den Einstellungen oben, jede in einem eigenen Ordner.</div>
       <div class="hint">In Premiere: ZIP entpacken, „Datei › Importieren“, das erste Bild auswählen und „Bildsequenz“ anhaken. Der Hintergrund ist transparent. Stimmt die Länge nicht, die Framerate über „Ändern › Filmmaterial interpretieren“ auf den Wert oben setzen.</div>
     </div>
   </div>
@@ -189,6 +192,7 @@ function fmtDur(s) {
   return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)) + ':' + pad2(s % 60);
 }
 const fmtClock = ms => new Date(ms).toLocaleTimeString('de-DE');
+const fmtClockShort = ms => new Date(ms).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
 
 // ---------- FIT ----------
 const FIT_EPOCH = 631065600; // 1989-12-31T00:00:00Z
@@ -768,10 +772,12 @@ const fmtKm = (m, dec) => (m / 1000).toLocaleString('de-DE', {minimumFractionDig
 const OV_FIELDS = [
   {id: 'dist', label: 'Distanz', unit: 'km', on: true, val: (r, c) => fmtKm(c.scope === 'stage' ? r.sDist : r.dist, c.dec)},
   {id: 'asc', label: 'Aufstieg', unit: 'hm', on: true, val: (r, c) => nf0.format(c.scope === 'stage' ? r.sAsc : r.asc)},
-  {id: 'moving', label: 'Fahrzeit', unit: 'h', val: (r, c) => fmtDur(r.moving - (c.scope === 'stage' ? state.track.moving[state.stages[r.stage - 1].start] : 0))},
+  {id: 'moving', label: 'Fahrzeit', unit: 'h', val: (r, c) => fmtDur(ovMoving(r, c))},
   {id: 'elapsed', label: 'Gesamtzeit', unit: 'h', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
-  {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: r => fmtClock(r.clock)},
+  {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: (r, c) => (c.clockSec ? fmtClock : fmtClockShort)(r.clock)},
   {id: 'speed', label: 'Tempo', unit: 'km/h', val: r => r.speed == null ? '–' : nf1.format(r.speed * 3.6)},
+  // Schnitt über die Fahrzeit; in den ersten Sekunden wäre der Wert noch reines Rauschen
+  {id: 'avg', label: 'Ø Tempo', unit: 'km/h', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : nf1.format((c.scope === 'stage' ? r.sDist : r.dist) / m * 3.6); }},
   {id: 'hr', label: 'Puls', unit: 'bpm', val: r => r.hr == null ? '–' : nf0.format(r.hr)},
   {id: 'grade', label: 'Steigung', unit: '%', val: r => nf0.format(Math.round(r.grade) || 0)},
   {id: 'ele', label: 'Höhe', unit: 'm', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
@@ -780,7 +786,7 @@ $('ovChecks').innerHTML = OV_FIELDS.map(f => `<label><input type="checkbox" id="
   '<label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
 
 // Einstellungen merken
-const OV_SAVED = ['ovDur', 'ovFps', 'ovSpeed', 'ovSize', 'ovWeight', 'ovDec', 'ovScope', 'ovAccent', 'ovProfile', 'ovBox', ...OV_FIELDS.map(f => 'ovf_' + f.id)];
+const OV_SAVED = ['ovDur', 'ovFps', 'ovSpeed', 'ovSize', 'ovWeight', 'ovDec', 'ovClock', 'ovScope', 'ovAccent', 'ovProfile', 'ovBox', ...OV_FIELDS.map(f => 'ovf_' + f.id)];
 try {
   const saved = JSON.parse(localStorage.getItem('sectionviewer.overlay') || '{}');
   for (const id of OV_SAVED) if (id in saved) $(id)[$(id).type === 'checkbox' ? 'checked' : 'value'] = saved[id];
@@ -797,6 +803,8 @@ function openSansAvailable() {
 
 // Summe der Gesamtzeiten aller Etappen vor Etappe si (Nächte dazwischen zählen nicht mit)
 const elapsedBefore = si => state.stages.slice(0, si).reduce((a, s) => a + (s.track.t[s.track.n - 1] - s.track.t[0]) / 1000, 0);
+// Fahrzeit bis zum Punkt, je nach Bezug seit Tourstart oder seit Tagesstart
+const ovMoving = (r, c) => r.moving - (c.scope === 'stage' ? state.track.moving[state.stages[r.stage - 1].start] : 0);
 
 // Steigung in Prozent, gemittelt über 100 m um den Punkt
 function gradeAt(si, sDist) {
@@ -821,16 +829,19 @@ function ovSample(c, tau) {
   return r;
 }
 
-function ovConfig() {
+// Ohne Angabe gilt der Startpunkt aus dem Feld „Start des Clips“
+function ovConfig(r0) {
   const T = state.track;
   if (!T) return null;
-  const tok = $('ovStart').value.trim().split(/\s+/)[0];
-  const r0 = tok ? parseCustom(tok).out[0] : rowAt({i: 0, f: 0}, '');
+  if (!r0) {
+    const tok = $('ovStart').value.trim().split(/\s+/)[0];
+    r0 = tok ? parseCustom(tok).out[0] : rowAt({i: 0, f: 0}, '');
+  }
   if (!r0) return {error: 'Startpunkt nicht erkannt oder außerhalb der Tour.'};
   const s = +$('ovSize').value, si = r0.stage - 1;
   const c = {
     r0, si, t0: r0.clock, s, fps: +$('ovFps').value, speed: Math.max(0.01, parseFloat($('ovSpeed').value) || 1),
-    scope: multi() ? $('ovScope').value : 'tour', dec: +$('ovDec').value, accent: $('ovAccent').value,
+    scope: multi() ? $('ovScope').value : 'tour', dec: +$('ovDec').value, clockSec: $('ovClock').value === '1', accent: $('ovAccent').value,
     profile: $('ovProfile').checked && T.hasEle,
   };
   const A = state.stages[si].track;
@@ -943,7 +954,7 @@ function ovRefresh() {
   // Werte, die die Datei nicht enthält, lassen sich nicht einblenden
   const T = state.track;
   if (T) {
-    const has = {moving: !!T.t, elapsed: !!T.t, clock: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
+    const has = {moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
     for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
     $('ovProfile').disabled = !T.hasEle;
   }
@@ -1043,35 +1054,43 @@ function makeZip(files) {
   return new Blob([...parts, ...central, end], {type: 'application/zip'});
 }
 
-$('ovZip').addEventListener('click', async () => {
-  if (ov.busy) { ov.cancel = true; return; }
-  const c = ov.cfg, prog = $('ovProg'), btn = $('ovZip');
-  if (!c || c.error || c.empty) return;
-  if (c.frames > 20000) { prog.textContent = 'Zu viele Bilder (maximal 20.000) – bitte Dauer oder Bilder/s verringern.'; return; }
-  ov.busy = true; ov.cancel = false;
+// Rendert die Sequenzen aus list ({c, base}) jeweils in einen eigenen Ordner und speichert alles als ein ZIP
+async function ovExport(btn, list, zipName) {
+  if (ov.busy) { if (ov.busy === btn) ov.cancel = true; return; }
+  const prog = $('ovProg');
+  // 60.000 Bilder insgesamt: mehr Einträge fasst ein ZIP ohne ZIP64 nicht
+  if (list.some(x => x.c.frames > 20000) || list.reduce((a, x) => a + x.c.frames, 0) > 60000) {
+    prog.textContent = 'Zu viele Bilder (maximal 20.000 je Sequenz' + (list.length > 1 ? ', 60.000 insgesamt' : '') + ') – bitte Dauer oder Bilder/s verringern.';
+    return;
+  }
+  ov.busy = btn; ov.cancel = false;
   const label = btn.textContent;
   btn.textContent = 'Abbrechen';
   try {
-    await ovFonts(c);
-    const canvas = document.createElement('canvas'), files = [], base = ovName(c);
-    let lastKey = null, bytes = null, total = 0;
-    for (let f = 0; f < c.frames && !ov.cancel; f++) {
-      const r = ovSample(c, f / c.fps), k = ovKey(r, c);
-      if (k.key !== lastKey) { // unveränderte Bilder nicht neu rendern
-        ovDraw(canvas, r, c, k);
-        bytes = new Uint8Array(await (await toPng(canvas)).arrayBuffer());
-        lastKey = k.key;
-      } else if (f % 50 === 0) await new Promise(res => setTimeout(res));
-      total += bytes.length;
-      if (total > 3.5e9) throw new Error('Die Sequenz wird zu groß – bitte Dauer verringern.');
-      files.push({name: `${base}/${base}_${String(f).padStart(5, '0')}.png`, bytes});
-      if (f % 10 === 0) prog.textContent = `Bild ${f + 1} von ${c.frames} …`;
+    await ovFonts(list[0].c);
+    const canvas = document.createElement('canvas'), files = [];
+    let total = 0;
+    for (const [n, {c, base}] of list.entries()) {
+      const pre = list.length > 1 ? `Punkt ${n + 1} von ${list.length} · ` : '';
+      let lastKey = null, bytes = null;
+      for (let f = 0; f < c.frames && !ov.cancel; f++) {
+        const r = ovSample(c, f / c.fps), k = ovKey(r, c);
+        if (k.key !== lastKey) { // unveränderte Bilder nicht neu rendern
+          ovDraw(canvas, r, c, k);
+          bytes = new Uint8Array(await (await toPng(canvas)).arrayBuffer());
+          lastKey = k.key;
+        } else if (f % 50 === 0) await new Promise(res => setTimeout(res));
+        total += bytes.length;
+        if (total > 3.5e9) throw new Error('Die Sequenz wird zu groß – bitte Dauer verringern.');
+        files.push({name: `${base}/${base}_${String(f).padStart(5, '0')}.png`, bytes});
+        if (f % 10 === 0) prog.textContent = `${pre}Bild ${f + 1} von ${c.frames} …`;
+      }
     }
     if (ov.cancel) { prog.textContent = 'Abgebrochen.'; return; }
     prog.textContent = 'ZIP wird erstellt …';
     await new Promise(res => setTimeout(res));
-    download(makeZip(files), base + '.zip');
-    prog.textContent = `${nf0.format(files.length)} Bilder gespeichert (${nf0.format(total / 1048576)} MB).`;
+    download(makeZip(files), zipName);
+    prog.textContent = (list.length > 1 ? `${list.length} Sequenzen, ` : '') + `${nf0.format(files.length)} Bilder gespeichert (${nf0.format(total / 1048576)} MB).`;
   } catch (e) {
     console.error(e);
     prog.textContent = e.message || 'Export fehlgeschlagen.';
@@ -1079,6 +1098,22 @@ $('ovZip').addEventListener('click', async () => {
     ov.busy = false;
     btn.textContent = label;
   }
+}
+
+$('ovZip').addEventListener('click', ev => {
+  const c = ov.cfg;
+  if (!c || c.error || c.empty) return;
+  ovExport(ev.currentTarget, [{c, base: ovName(c)}], ovName(c) + '.zip');
+});
+
+// Je eigenem Punkt eine Sequenz, in Tourreihenfolge durchnummeriert
+$('ovAll').addEventListener('click', ev => {
+  if (ov.busy) { ovExport(ev.currentTarget, []); return; }
+  if (!ov.cfg || ov.cfg.empty) return;
+  const rows = parseCustom($('custom').value).out.sort((a, b) => a.dist - b.dist);
+  if (!rows.length) { $('ovProg').textContent = 'Keine eigenen Punkte eingetragen.'; return; }
+  const list = rows.map((r, n) => { const c = ovConfig(r); return {c, base: pad2(n + 1) + '_' + ovName(c)}; });
+  ovExport(ev.currentTarget, list, (multi() ? 'tour' : state.stages[0].name.replace(/\.[^.]+$/, '')) + '_overlays.zip');
 });
 
 // ---------- Controls & file loading ----------
