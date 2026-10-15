@@ -13,6 +13,9 @@
 # Versteckte Dateien (.git, .gitignore, .htpasswd ...) nie ausliefern
 RedirectMatch 404 /\.(?!well-known)
 
+# Die README gehört zum Repo, nicht zur Seite (Plesk stellt das ganze Repo bereit)
+RedirectMatch 404 (?i)/README\.md$
+
 # Falls doch einmal Aufzeichnungen oder Sessions im Webverzeichnis landen: nicht ausliefern
 <FilesMatch "(\.(fit|gpx)|_session\.json)$">
   Require all denied
