@@ -54,6 +54,7 @@ try { places = JSON.parse(localStorage.getItem('sectionviewer.places') || '{}');
 let marks = {};
 try { marks = JSON.parse(localStorage.getItem('sectionviewer.marks') || '{}'); } catch {}
 const savePlaces = () => { try { localStorage.setItem('sectionviewer.places', JSON.stringify(places)); } catch {} };
+const saveMarks = () => { try { localStorage.setItem('sectionviewer.marks', JSON.stringify(marks)); } catch {} };
 const placeKey = r => r.lat == null ? null : r.lat.toFixed(3) + ',' + r.lon.toFixed(3);
 // Sucht auch in den Nachbarfeldern, damit ein Punkt knapp neben der Rundungsgrenze seinen Namen behält
 function placeOf(r) {
@@ -76,7 +77,7 @@ $('tbody').addEventListener('change', ev => {
   const key = ev.target.dataset.place, mark = ev.target.dataset.mark;
   if (mark) {
     if (ev.target.checked) marks[mark] = 1; else delete marks[mark];
-    try { localStorage.setItem('sectionviewer.marks', JSON.stringify(marks)); } catch {}
+    saveMarks();
   } else if (key) setPlace(key, ev.target.value.trim(), ev.target);
   else return;
   ovRefresh();

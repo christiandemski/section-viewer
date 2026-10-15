@@ -1,6 +1,7 @@
 # Eigene Aufzeichnungen enthalten GPS-Daten (Wohnort, Routen) und gehören nicht ins Repo
 *.fit
 *.gpx
+*_session.json
 
 # Zugangsdaten
 .htpasswd

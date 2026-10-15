@@ -47,24 +47,26 @@ function sortStages() {
   }
 }
 
+// Wertet eine FIT- oder GPX-Datei aus und hängt sie als Etappe an; die Rohdaten
+// bleiben für „Session speichern“ erhalten
+function addStage(name, buf) {
+  const key = name + '|' + buf.byteLength;
+  if (state.stages.some(s => s.key === key)) return;
+  const head = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
+  const isFit = head.length >= 12 && String.fromCharCode(...head.subarray(8, 12)) === '.FIT';
+  const parsed = isFit ? parseFit(buf) : parseGpx(new TextDecoder().decode(buf));
+  const track = buildTrack(parsed.points);
+  if (!state.stages.length) { state.thr = isFit ? 2 : 3; state.auto = true; }
+  state.stages.push({key, name, track, device: parsed.device, buf});
+}
+const readError = (name, e) => { console.error(e); return name + ': ' + (e.message || 'Die Datei konnte nicht gelesen werden.'); };
+
 async function loadFiles(files) {
   $('status').textContent = '';
   const errors = [];
   for (const file of files) {
-    try {
-      const key = file.name + '|' + file.size;
-      if (state.stages.some(s => s.key === key)) continue;
-      const buf = await file.arrayBuffer();
-      const head = new Uint8Array(buf, 0, Math.min(12, buf.byteLength));
-      const isFit = head.length >= 12 && String.fromCharCode(...head.subarray(8, 12)) === '.FIT';
-      const parsed = isFit ? parseFit(buf) : parseGpx(new TextDecoder().decode(buf));
-      const track = buildTrack(parsed.points);
-      if (!state.stages.length) { state.thr = isFit ? 2 : 3; state.auto = true; }
-      state.stages.push({key, name: file.name, track, device: parsed.device});
-    } catch (e) {
-      console.error(e);
-      errors.push(file.name + ': ' + (e.message || 'Die Datei konnte nicht gelesen werden.'));
-    }
+    try { addStage(file.name, await file.arrayBuffer()); }
+    catch (e) { errors.push(readError(file.name, e)); }
   }
   if (!state.manualOrder) sortStages();
   combine();
@@ -72,15 +74,89 @@ async function loadFiles(files) {
   $('status').textContent = errors.join(' · ');
 }
 
+// ---------- Session ----------
+// Eine Session-Datei enthält die Original-Dateien, damit sie beim Laden genauso
+// ausgewertet werden wie beim ersten Mal, dazu Eingaben, Einstellungen und die
+// Ortsnamen entlang der Tour (für andere Geräte, deren Browser sie nicht kennt)
+const SESSION_TYPE = 'section-viewer-session';
+const toBase64 = buf => new Promise((res, rej) => {
+  const r = new FileReader();
+  r.onload = () => res(r.result.slice(r.result.indexOf(',') + 1));
+  r.onerror = () => rej(r.error);
+  r.readAsDataURL(new Blob([buf]));
+});
+
+$('sessionSave').addEventListener('click', async () => {
+  const S = state.stages, keys = new Set();
+  for (const s of S) for (let i = 0; i < s.track.n; i++) {
+    const k = placeKey({lat: s.track.lat[i], lon: s.track.lon[i]});
+    if (k) keys.add(k);
+  }
+  const along = obj => Object.fromEntries(Object.entries(obj).filter(([k]) => keys.has(k)));
+  const json = JSON.stringify({
+    type: SESSION_TYPE, version: 1,
+    files: await Promise.all(S.map(async s => ({name: s.name, data: await toBase64(s.buf)}))),
+    manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
+    interval: $('interval').value, custom: $('custom').value, ovStart: $('ovStart').value,
+    overlay: ovSettings(OV_SAVED), places: along(places), marks: along(marks),
+  });
+  download(new Blob([json], {type: 'application/json'}), (multi() ? 'tour' : S[0].name.replace(/\.[^.]+$/, '')) + '_session.json');
+});
+
+// Ersetzt die geladenen Dateien; unpassende Werte (z. B. von Hand bearbeitet) werden übergangen
+async function loadSession(saved, fileName) {
+  $('status').textContent = '';
+  if (!Array.isArray(saved.files) || !saved.files.length) { $('status').textContent = `„${fileName}“ enthält keine Touren.`; return; }
+  const errors = [], before = state.stages;
+  state.stages = [];
+  for (const f of saved.files) {
+    const name = String(f && f.name);
+    try {
+      let bytes;
+      try { bytes = Uint8Array.from(atob(f.data), c => c.charCodeAt(0)); }
+      catch { throw new Error('Die Daten in der Session-Datei sind beschädigt.'); }
+      addStage(name, bytes.buffer);
+    } catch (e) { errors.push(readError(name, e)); }
+  }
+  // Ist nichts lesbar, bleibt die bisherige Tour offen
+  if (!state.stages.length) { state.stages = before; $('status').textContent = errors.join(' · '); return; }
+  // gespeicherte Reihenfolge beibehalten
+  state.manualOrder = saved.manualOrder === true;
+  if (Number.isFinite(saved.thr) && saved.thr >= 0) state.thr = saved.thr;
+  if (typeof saved.auto === 'boolean') state.auto = saved.auto;
+  for (const id of ['custom', 'ovStart']) $(id).value = typeof saved[id] === 'string' ? saved[id] : '';
+  if ([...$('interval').options].some(o => o.value === saved.interval)) {
+    $('interval').value = saved.interval;
+    try { localStorage.setItem('sectionviewer.interval', saved.interval); } catch {}
+  }
+  if (saved.overlay && typeof saved.overlay === 'object') ovApply(saved.overlay, OV_SAVED);
+  // Ortsnamen nur ergänzen; eigene Korrekturen in diesem Browser haben Vorrang
+  for (const [k, v] of Object.entries(saved.places || {})) if (typeof v === 'string' && v && !(k in places)) places[k] = v;
+  for (const k of Object.keys(saved.marks || {})) marks[k] = 1;
+  savePlaces();
+  saveMarks();
+  combine();
+  update();
+  $('status').textContent = errors.join(' · ');
+}
+
+// Session-Dateien und Gestaltungsvorlagen sind beide .json; unterschieden wird am Inhalt
+async function loadJson(file) {
+  let saved = null;
+  try { saved = JSON.parse(await file.text()); } catch {}
+  if (saved && saved.type === SESSION_TYPE) loadSession(saved, file.name);
+  else ovLoadDesign(file);
+}
+function openFiles(files) {
+  const jsons = files.filter(f => /\.json$/i.test(f.name)), tracks = files.filter(f => !jsons.includes(f));
+  jsons.forEach(loadJson);
+  if (tracks.length) loadFiles(tracks);
+}
+
 try { const v = localStorage.getItem('sectionviewer.interval'); if (v != null) $('interval').value = v; } catch {}
 const drop = $('drop');
 drop.addEventListener('click', () => $('file').click());
-$('file').addEventListener('change', ev => { loadFiles([...ev.target.files]); ev.target.value = ''; });
+$('file').addEventListener('change', ev => { openFiles([...ev.target.files]); ev.target.value = ''; });
 for (const t of ['dragenter', 'dragover']) window.addEventListener(t, ev => { ev.preventDefault(); if ([...ev.dataTransfer.types].includes('Files')) drop.classList.add('over'); });
 for (const t of ['dragleave', 'drop']) window.addEventListener(t, ev => { ev.preventDefault(); drop.classList.remove('over'); });
-window.addEventListener('drop', ev => {
-  // Gestaltungsvorlagen (.json) laden, alles andere als Tour
-  const files = [...ev.dataTransfer.files], designs = files.filter(f => /\.json$/i.test(f.name)), tracks = files.filter(f => !designs.includes(f));
-  designs.forEach(ovLoadDesign);
-  if (tracks.length) loadFiles(tracks);
-});
+window.addEventListener('drop', ev => openFiles([...ev.dataTransfer.files]));

@@ -15,9 +15,9 @@
   <p class="sub">Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten</p>
 
   <div id="drop" class="card">
-    <strong>FIT- oder GPX-Dateien hierher ziehen</strong> oder klicken zum Auswählen.<br>
+    <strong>FIT- oder GPX-Dateien hierher ziehen</strong> oder klicken zum Auswählen. Eine gespeicherte Session (.json) lässt sich genauso öffnen.<br>
     <span class="hint">Mehrere Dateien werden als Etappen einer Tour aneinandergehängt. Alles wird nur lokal im Browser ausgewertet, nichts wird hochgeladen.</span>
-    <input id="file" type="file" accept=".fit,.gpx" multiple hidden>
+    <input id="file" type="file" accept=".fit,.gpx,.json" multiple hidden>
     <div id="status"></div>
   </div>
 
@@ -64,10 +64,11 @@
     <div class="card">
       <div class="tablehead">
         <h2>Werte bis zum jeweiligen Punkt</h2>
-        <div class="inline"><button id="reset">Alle Dateien entfernen</button><button id="places">Orte abrufen</button><button id="copyAll">Tabelle kopieren</button><button id="csv">CSV speichern</button></div>
+        <div class="inline"><button id="reset">Alle Dateien entfernen</button><button id="sessionSave" title="Dateien, eigene Punkte, Einstellungen und Ortsnamen in einer .json-Datei speichern">Session speichern</button><button id="places">Orte abrufen</button><button id="copyAll">Tabelle kopieren</button><button id="csv">CSV speichern</button></div>
       </div>
       <div class="scroll"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
       <div class="hint" id="placeHint">„Orte abrufen“ sendet die Koordinaten der Tabellenpunkte an OpenStreetMap (Nominatim) – nur dann verlässt etwas den Browser. Die Namen lassen sich in der Tabelle überschreiben und bleiben gespeichert. Ortsdaten © OpenStreetMap-Mitwirkende. <span id="placeProg" class="warn"></span></div>
+      <div class="hint">„Session speichern“ legt alles in einer .json-Datei ab, um später oder auf einem anderen Gerät weiterzumachen: die Datei einfach auf die Seite ziehen. Sie enthält die vollständigen Aufzeichnungen mit allen GPS-Daten.</div>
     </div>
 
     <div class="card" id="ovCard">
