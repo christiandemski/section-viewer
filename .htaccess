@@ -23,4 +23,13 @@ RedirectMatch 404 /\.(?!well-known)
   Header set X-Robots-Tag "noindex, nofollow"
 </IfModule>
 
+# Seite, CSS und JS bei jedem Aufruf beim Server prüfen lassen (kostet bei
+# unveränderten Dateien nur eine kurze 304-Antwort), damit nach einem Deploy
+# nicht alte und neue Dateien gemischt im Browser landen
+<IfModule mod_headers.c>
+  <FilesMatch "\.(html|css|js)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
 Options -Indexes
