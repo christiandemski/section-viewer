@@ -10,7 +10,8 @@ function renderSummary() {
   const S = state.stages;
   if (T.t) {
     const elapsed = S.reduce((a, s) => a + (s.track.t[s.track.n - 1] - s.track.t[0]) / 1000, 0);
-    tiles.push(['Fahrzeit', fmtDur(T.moving[last]), ''], ['Gesamtzeit', fmtDur(elapsed), '']);
+    tiles.push([isRun() ? 'Laufzeit' : 'Fahrzeit', fmtDur(T.moving[last]), ''], ['Gesamtzeit', fmtDur(elapsed), '']);
+    if (isRun() && T.moving[last] > 0) tiles.push(['Ø Pace', fmtPace(T.dist[last] / T.moving[last]), '/km']);
   }
   if (multi()) tiles.unshift(['Etappen', S.length, '']);
   $('tiles').innerHTML = tiles.map(([k, v, u]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');
@@ -33,17 +34,20 @@ const COLS = [
   {key: 'asc', head: 'Aufstieg', csv: 'Aufstieg (hm)', fmt: v => nf0.format(v) + ' hm', raw: v => v.toFixed(0), main: true},
   {key: 'desc', head: 'Abstieg', csv: 'Abstieg (hm)', fmt: v => nf0.format(v) + ' hm', raw: v => v.toFixed(0)},
   {key: 'ele', head: 'Höhe', csv: 'Höhe (m)', fmt: v => nf0.format(v) + ' m', raw: v => v.toFixed(0)},
-  {key: 'moving', head: 'Fahrzeit', csv: 'Fahrzeit', fmt: fmtDur, raw: fmtDur},
+  {key: 'moving', head: 'Fahrzeit', csv: 'Fahrzeit', fmt: fmtDur, raw: fmtDur, run: {head: 'Laufzeit', csv: 'Laufzeit'}},
   {key: 'elapsed', head: 'Zeit seit Start', csv: 'Zeit seit Start', fmt: fmtDur, raw: fmtDur},
   {key: 'clock', head: 'Uhrzeit', csv: 'Uhrzeit', fmt: fmtClock, raw: fmtClock},
-  {key: 'speed', head: 'Tempo', csv: 'Tempo (km/h)', fmt: v => nf1.format(v * 3.6) + ' km/h', raw: v => (v * 3.6).toFixed(1)},
+  {key: 'speed', head: 'Tempo', csv: 'Tempo (km/h)', fmt: v => nf1.format(v * 3.6) + ' km/h', raw: v => (v * 3.6).toFixed(1),
+    run: {head: 'Pace', csv: 'Pace (min/km)', fmt: v => paceSec(v) == null ? '–' : fmtPace(v) + ' /km', raw: v => paceSec(v) == null ? '' : fmtPace(v)}},
   {key: 'hr', head: 'Puls', csv: 'Puls (bpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0)},
   {key: 'power', head: 'Leistung', csv: 'Leistung (W)', fmt: v => nf0.format(v) + ' W', raw: v => v.toFixed(0)},
-  {key: 'cad', head: 'Kadenz', csv: 'Kadenz (rpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0)},
+  {key: 'cad', head: 'Kadenz', csv: 'Kadenz (rpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0),
+    run: {head: 'Schritte/min', csv: 'Schritte/min', fmt: v => nf0.format(v * cadMul()), raw: v => (v * cadMul()).toFixed(0)}},
   {key: 'temp', head: 'Temp.', csv: 'Temperatur (°C)', fmt: v => nf0.format(v) + ' °C', raw: v => v.toFixed(0)},
 ];
+const cadMul = () => state.track.cadMed != null && state.track.cadMed < 120 ? 2 : 1;
 // Spalten, für die die Datei überhaupt Daten enthält
-const activeCols = () => COLS.filter(c => (!c.multi || multi()) && state.rows.some(r => r[c.key] != null) &&
+const activeCols = () => COLS.map(bySport).filter(c => (!c.multi || multi()) && state.rows.some(r => r[c.key] != null) &&
   (Array.isArray(state.track[c.key]) ? state.track[c.key].some(v => v != null) : true));
 
 // ---------- Orte ----------

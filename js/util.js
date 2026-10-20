@@ -8,6 +8,14 @@ function fmtDur(s) {
   s = Math.round(s);
   return Math.floor(s / 3600) + ':' + pad2(Math.floor(s % 3600 / 60)) + ':' + pad2(s % 60);
 }
+// Pace in Minuten pro Kilometer aus m/s; langsamer als 20:50 /km gilt als Stehen
+const paceSec = mps => mps == null || mps < 0.8 ? null : 1000 / mps;
+function fmtPace(mps) {
+  const p = paceSec(mps);
+  if (p == null) return '–';
+  const s = Math.round(p);
+  return Math.floor(s / 60) + ':' + pad2(s % 60);
+}
 const fmtClock = ms => new Date(ms).toLocaleTimeString('de-DE');
 const fmtClockShort = ms => new Date(ms).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
 

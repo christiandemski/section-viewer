@@ -24,6 +24,7 @@ function parseFit(buf) {
   const dv = new DataView(buf);
   const points = [];
   const device = {ascent: null, descent: null, distance: null};
+  let sport = null;
   let sessions = 0, start = 0;
 
   while (start + 12 <= buf.byteLength) {
@@ -63,6 +64,8 @@ function parseFit(buf) {
         });
       } else {
         sessions++;
+        // Sportart der ersten Einheit: 1 = Laufen, 2 = Radfahren
+        if (sport == null && m[5] != null) sport = m[5] === 1 ? 'run' : m[5] === 2 ? 'ride' : '';
         if (m[22] != null) device.ascent = (device.ascent || 0) + m[22];
         if (m[23] != null) device.descent = (device.descent || 0) + m[23];
         if (m[9] != null) device.distance = (device.distance || 0) + m[9] / 100;
@@ -103,7 +106,7 @@ function parseFit(buf) {
     }
     start = end + 2; // CRC, then possibly a chained file
   }
-  return {points, device: sessions ? device : null};
+  return {points, device: sessions ? device : null, sport: sport || null};
 }
 
 // ---------- GPX ----------
@@ -129,6 +132,10 @@ function parseGpx(text) {
     }
     points.push(pt);
   }
-  return {points, device: null};
+  // <type> des Tracks, z. B. „running“ (Garmin) oder „9“ (Strava)
+  const trk = doc.getElementsByTagNameNS('*', 'trk')[0];
+  const type = trk ? ([...trk.children].find(el => el.localName === 'type') || {}).textContent || '' : '';
+  const sport = /run|^9$/i.test(type.trim()) ? 'run' : /cycl|bik|ride|^1$/i.test(type.trim()) ? 'ride' : null;
+  return {points, device: null, sport};
 }
 

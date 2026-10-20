@@ -10,6 +10,11 @@
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,"Segoe UI",sans-serif}
 main{max-width:1700px;margin:0 auto;padding:24px 16px 64px}
 h1{font-size:22px;margin:0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.sport{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.sport button{border:0;border-radius:0;background:none;padding:6px 18px;font-weight:600;color:var(--ink2)}
+.sport button+button{border-left:1px solid var(--line)}
+.sport button[aria-pressed=true]{background:var(--accent);color:#fff}
 .sub{color:var(--ink2);margin:2px 0 20px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
 #drop{border:2px dashed var(--line);text-align:center;padding:28px 16px;cursor:pointer;color:var(--ink2)}
@@ -78,3 +83,28 @@ td input[type=text]{width:160px;padding:2px 6px;font-size:13px}
 [hidden]{display:none!important}
 .warn{color:var(--warn)}
 #ovDesignName{max-width:240px}
+
+/* ---------- Lauf: kräftigere Signalfarbe, schmale kursive Schrift, kantigere Formen ---------- */
+[data-sport=run]{
+  --bg:#f4f4f2; --accent:#e5361f; --accent-soft:rgba(229,54,31,.13);
+  --cond:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){[data-sport=run]{
+  --bg:#0e0f11; --surface:#17191c; --line:#2b2e33; --accent:#ff5a3c; --accent-soft:rgba(255,90,60,.17);
+}}
+[data-sport=run] h1{font:italic 800 34px/1 var(--cond);text-transform:uppercase;letter-spacing:.01em;display:flex;align-items:center;gap:12px}
+[data-sport=run] h1::after{content:"";width:44px;height:20px;background:repeating-linear-gradient(-60deg,var(--accent) 0 5px,transparent 5px 10px)}
+[data-sport=run] .sub{font:italic 500 17px var(--cond);letter-spacing:.02em}
+[data-sport=run] h2,[data-sport=run] #ovDesign summary{font:italic 700 20px var(--cond);text-transform:uppercase;letter-spacing:.02em}
+[data-sport=run] .card{border-radius:3px}
+[data-sport=run] .card:first-child{border-top:4px solid var(--accent)}
+[data-sport=run] .tile{border-left:3px solid var(--accent);padding-left:10px}
+[data-sport=run] .tile .k{font:600 12px var(--cond);text-transform:uppercase;letter-spacing:.1em}
+[data-sport=run] .tile .v{font:italic 700 36px/1.1 var(--cond)}
+[data-sport=run] .tile .v small{font:500 16px var(--cond)}
+[data-sport=run] th{font-family:var(--cond);font-size:13px;text-transform:uppercase;letter-spacing:.05em}
+[data-sport=run] td.main{color:var(--accent)}
+[data-sport=run] button,[data-sport=run] input,[data-sport=run] select{border-radius:3px}
+[data-sport=run] .sport{border-radius:3px;transform:skewX(-12deg)}
+[data-sport=run] .sport button{font:italic 700 16px var(--cond);text-transform:uppercase;letter-spacing:.06em;padding:5px 20px}
+[data-sport=run] .ovgh{font-family:var(--cond);font-size:13px;letter-spacing:.1em}

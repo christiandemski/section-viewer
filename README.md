@@ -13,6 +13,8 @@ Kleine Web-App, die Kilometer und Höhenmeter einer Rad- oder Wandertour bis zu 
 - **Overlay für Videos**: Zähler, Mini-Karte und Höhenprofil als PNG-Sequenz (ZIP) oder Einzelbild, für 1080p oder 4K, mit Zeitraffer. Layout, Schrift, Farben und Karte lassen sich gestalten und als Vorlage (`.json`) speichern.
 - **Session speichern**: Dateien, eigene Punkte, Einstellungen und Ortsnamen in einer `_session.json` sichern. Um später oder auf einem anderen Gerät weiterzumachen, die Datei einfach auf die Seite ziehen.
 
+- **Rad oder Lauf**: Umschalter oben rechts. Im Laufmodus zeigt die Seite Pace (min/km) statt km/h, Laufzeit statt Fahrzeit, Schritte pro Minute statt Kadenz und Abschnitte ab 1 km, in eigenem Design. FIT- und GPX-Dateien, die ihre Sportart angeben, schalten beim Öffnen einer neuen Tour automatisch um; die Wahl wird gemerkt und in der Session gespeichert.
+
 ## Datenschutz
 
 Die Aufzeichnungen werden nur lokal im Browser ausgewertet, nichts wird hochgeladen. Daten verlassen den Browser nur in zwei Fällen:

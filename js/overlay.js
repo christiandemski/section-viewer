@@ -7,20 +7,26 @@ const OV_FIELDS = [
   {id: 'place', label: 'Ort', unit: '', val: (r, c) => c.place},
   {id: 'dist', label: 'Distanz', unit: 'km', on: true, val: (r, c) => fmtKm(c.scope === 'stage' ? r.sDist : r.dist, c.dec)},
   {id: 'asc', label: 'Aufstieg', unit: 'hm', on: true, val: (r, c) => nf0.format(c.scope === 'stage' ? r.sAsc : r.asc)},
-  {id: 'moving', label: 'Fahrzeit', unit: 'Std.', val: (r, c) => fmtDur(ovMoving(r, c))},
+  {id: 'moving', label: 'Fahrzeit', unit: 'Std.', val: (r, c) => fmtDur(ovMoving(r, c)), run: {label: 'Laufzeit'}},
   {id: 'elapsed', label: 'Gesamtzeit', unit: 'Std.', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
   {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: (r, c) => (c.clockSec ? fmtClock : fmtClockShort)(r.clock)},
   // wide: breitester zu erwartender Wert, damit die Spalten der Leiste nicht springen
-  {id: 'speed', label: 'Tempo', unit: 'km/h', wide: '00,0', val: r => r.speed == null ? '–' : nf1.format(r.speed * 3.6)},
+  {id: 'speed', label: 'Tempo', unit: 'km/h', wide: '00,0', val: r => r.speed == null ? '–' : nf1.format(r.speed * 3.6),
+    run: {label: 'Pace', unit: '/km', wide: '00:00', val: r => fmtPace(r.speed)}},
   // Schnitt über die Fahrzeit; in den ersten Sekunden wäre der Wert noch reines Rauschen
-  {id: 'avg', label: 'Ø Tempo', unit: 'km/h', wide: '00,0', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : nf1.format((c.scope === 'stage' ? r.sDist : r.dist) / m * 3.6); }},
+  {id: 'avg', label: 'Ø Tempo', unit: 'km/h', wide: '00,0', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : nf1.format((c.scope === 'stage' ? r.sDist : r.dist) / m * 3.6); },
+    run: {label: 'Ø Pace', unit: '/km', wide: '00:00', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : fmtPace((c.scope === 'stage' ? r.sDist : r.dist) / m); }}},
   {id: 'hr', label: 'Puls', unit: 'bpm', wide: '000', val: r => r.hr == null ? '–' : nf0.format(r.hr)},
   {id: 'grade', label: 'Steigung', unit: '%', wide: '-00', val: r => nf0.format(Math.round(r.grade) || 0)},
   {id: 'ele', label: 'Höhe', unit: 'm', wide: '0000', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
   {id: 'temp', label: 'Temperatur', unit: '°C', wide: '-00', val: r => r.temp == null ? '–' : nf0.format(r.temp)},
 ];
-$('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${f.label}</label>`).join('') +
+$('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${bySport(f).label}</label>`).join('') +
   '<label><input type="checkbox" id="ovMap" checked>Karte</label><label><input type="checkbox" id="ovTiles">Kartenhintergrund</label><label><input type="checkbox" id="ovAttr" checked>© in der Karte</label><label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
+// Beschriftung der Häkchen nach einem Wechsel der Sportart
+function ovSportLabels() {
+  for (const f of OV_FIELDS) $('ovf_' + f.id).nextSibling.textContent = bySport(f).label;
+}
 
 // Einstellungen merken
 const OV_SAVED = ['ovDur', 'ovFps', 'ovSpeed', 'ovSize', 'ovWeight', 'ovDec', 'ovClock', 'ovScope', 'ovAccent', 'ovMap', 'ovTiles', 'ovAttr', 'ovProfile', 'ovBox',
@@ -204,7 +210,7 @@ function ovConfig(r0) {
   c.next = nx ? {name: placeOf(nx), dist: nx.dist} : null;
   // Reihenfolge wie die Häkchen; der Ort entfällt, solange kein Name bekannt ist
   const fields = [...$('ovChecks').querySelectorAll('.ovf input')].filter(el => el.checked && !el.disabled)
-    .map(el => OV_FIELDS.find(f => 'ovf_' + f.id === el.id)).filter(f => f.id !== 'place' || c.place);
+    .map(el => bySport(OV_FIELDS.find(f => 'ovf_' + f.id === el.id))).filter(f => f.id !== 'place' || c.place);
   const width = (spec, t) => { ovMeasure.font = spec; return ovMeasure.measureText(t).width; };
   // Lange Ortsnamen verkleinern, bis sie in placeW passen
   const fitPlace = () => { c.fontP = `${st}${wght} ${Math.floor(34 * u * Math.min(1, c.placeW / (width(c.fontV, c.place) || 1)))}px ${font}`; };
@@ -550,7 +556,7 @@ function ovRefresh() {
 // Lädt die benötigten Schriftschnitte; true, wenn dabei etwas neu geladen wurde
 async function ovFonts(c) {
   let fresh = false;
-  const words = OV_FIELDS.map(f => f.label + f.unit).join('');
+  const words = OV_FIELDS.flatMap(f => [f, f.run || {}]).map(f => (f.label || '') + (f.unit || '')).join('');
   const base = '0123456789,:–- ' + words + words.toUpperCase();
   // Der Ortsname kann Zeichen aus einem weiteren Teil der Schrift brauchen (z. B. ł, č)
   for (const [spec, text] of [[c.fontV, base], [c.fontL, base], [c.fontU, base], ...(c.place ? [[c.fontP, c.place]] : []), ...(c.next ? [[c.fontL, c.next.name]] : []),

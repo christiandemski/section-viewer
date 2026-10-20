@@ -1,7 +1,37 @@
 'use strict';
 
+// ---------- Sportart ----------
+// Rad und Lauf unterscheiden sich in Abschnitten, Texten, Werten (Tempo/Pace) und im Aussehen (CSS über <html data-sport>)
+const SPORT = {
+  ride: {intervals: [5, 10, 20, 25, 50, 100], interval: '10', store: 'sectionviewer.interval',
+    sub: 'Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten', custom: 'z. B.  12,5  123  157  1:30:00  @14:35'},
+  run: {intervals: [1, 2, 5, 10], interval: '1', store: 'sectionviewer.interval.run',
+    sub: 'Kilometer, Pace und Höhenmeter bis zu einem bestimmten Punkt des Laufs betrachten', custom: 'z. B.  5  10  21,1  1:30:00  @9:45'},
+};
+function setSport(sport) {
+  const S = SPORT[sport];
+  if (!S) return;
+  state.sport = sport;
+  document.documentElement.dataset.sport = sport;
+  for (const b of $('sport').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.sport === sport);
+  $('sub').textContent = S.sub;
+  $('custom').placeholder = S.custom;
+  let v = S.interval;
+  try { v = localStorage.getItem(S.store) ?? v; localStorage.setItem('sectionviewer.sport', sport); } catch {}
+  const sel = $('interval');
+  sel.innerHTML = '<option value="0">keine</option>' + S.intervals.map(k => `<option value="${k}">alle ${k} km</option>`).join('');
+  sel.value = [...sel.options].some(o => o.value === v) ? v : S.interval;
+  ovSportLabels();
+}
+$('sport').addEventListener('click', ev => {
+  const b = ev.target.closest('button');
+  if (!b || b.dataset.sport === state.sport) return;
+  setSport(b.dataset.sport);
+  update();
+});
+
 $('interval').addEventListener('change', () => {
-  try { localStorage.setItem('sectionviewer.interval', $('interval').value); } catch {}
+  try { localStorage.setItem(SPORT[state.sport].store, $('interval').value); } catch {}
   update();
 });
 $('custom').addEventListener('input', update);
@@ -57,18 +87,21 @@ function addStage(name, buf) {
   const parsed = isFit ? parseFit(buf) : parseGpx(new TextDecoder().decode(buf));
   const track = buildTrack(parsed.points);
   if (!state.stages.length) { state.thr = isFit ? 2 : 3; state.auto = true; }
-  state.stages.push({key, name, track, device: parsed.device, buf});
+  state.stages.push({key, name, track, device: parsed.device, sport: parsed.sport, buf});
 }
 const readError = (name, e) => { console.error(e); return name + ': ' + (e.message || 'Die Datei konnte nicht gelesen werden.'); };
 
 async function loadFiles(files) {
   $('status').textContent = '';
-  const errors = [];
+  const errors = [], fresh = !state.stages.length;
   for (const file of files) {
     try { addStage(file.name, await file.arrayBuffer()); }
     catch (e) { errors.push(readError(file.name, e)); }
   }
   if (!state.manualOrder) sortStages();
+  // Bei einer neuen Tour auf die Sportart umschalten, die die Datei angibt
+  const detected = fresh && state.stages.length && state.stages[0].sport;
+  if (detected && detected !== state.sport) setSport(detected);
   combine();
   update();
   $('status').textContent = errors.join(' · ');
@@ -96,7 +129,7 @@ $('sessionSave').addEventListener('click', async () => {
   const json = JSON.stringify({
     type: SESSION_TYPE, version: 1,
     files: await Promise.all(S.map(async s => ({name: s.name, data: await toBase64(s.buf)}))),
-    manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
+    sport: state.sport, manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
     interval: $('interval').value, custom: $('custom').value, ovStart: $('ovStart').value,
     overlay: ovSettings(OV_SAVED), places: along(places), marks: along(marks),
   });
@@ -120,6 +153,8 @@ async function loadSession(saved, fileName) {
   }
   // Ist nichts lesbar, bleibt die bisherige Tour offen
   if (!state.stages.length) { state.stages = before; $('status').textContent = errors.join(' · '); return; }
+  // vor den Abschnitten, deren Auswahl von der Sportart abhängt; ältere Sessions haben keine Angabe
+  setSport(Object.hasOwn(SPORT, saved.sport) ? saved.sport : state.stages[0].sport || state.sport);
   // gespeicherte Reihenfolge beibehalten
   state.manualOrder = saved.manualOrder === true;
   if (Number.isFinite(saved.thr) && saved.thr >= 0) state.thr = saved.thr;
@@ -127,7 +162,7 @@ async function loadSession(saved, fileName) {
   for (const id of ['custom', 'ovStart']) $(id).value = typeof saved[id] === 'string' ? saved[id] : '';
   if ([...$('interval').options].some(o => o.value === saved.interval)) {
     $('interval').value = saved.interval;
-    try { localStorage.setItem('sectionviewer.interval', saved.interval); } catch {}
+    try { localStorage.setItem(SPORT[state.sport].store, saved.interval); } catch {}
   }
   if (saved.overlay && typeof saved.overlay === 'object') ovApply(saved.overlay, OV_SAVED);
   // Ortsnamen nur ergänzen; eigene Korrekturen in diesem Browser haben Vorrang
@@ -153,7 +188,7 @@ function openFiles(files) {
   if (tracks.length) loadFiles(tracks);
 }
 
-try { const v = localStorage.getItem('sectionviewer.interval'); if (v != null) $('interval').value = v; } catch {}
+setSport(state.sport);
 const drop = $('drop');
 drop.addEventListener('click', () => $('file').click());
 $('file').addEventListener('change', ev => { openFiles([...ev.target.files]); ev.target.value = ''; });

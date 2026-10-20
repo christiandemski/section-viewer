@@ -90,8 +90,13 @@ function locate(arr, v) {
 
 // ---------- State ----------
 // stages: je Datei eine Etappe; track: alle Etappen aneinandergehängt
-const state = {stages: [], manualOrder: false, track: null, thr: 2, auto: true, asc: null, desc: null, rows: []};
+// sport: 'ride' oder 'run'; das Skript im <head> hat die gemerkte Sportart schon an <html> gesetzt
+const state = {stages: [], manualOrder: false, track: null, thr: 2, auto: true, asc: null, desc: null, rows: [],
+  sport: document.documentElement.dataset.sport === 'run' ? 'run' : 'ride'};
 const multi = () => state.stages.length > 1;
+const isRun = () => state.sport === 'run';
+// Spalten und Overlay-Werte mit Abweichungen fürs Laufen unter `run`
+const bySport = o => isRun() && o.run ? {...o, ...o.run} : o;
 const hasDeviceAscent = s => !!(s.device && s.device.ascent != null && s.track.hasEle);
 
 function combine() {
@@ -120,6 +125,9 @@ function combine() {
     if (hasTime) movOff = T.moving[o - 1];
   });
   T.hasGps = T.lat.some(v => v != null);
+  // Garmin speichert beim Laufen Doppelschritte pro Minute; am Median erkennbar
+  const cads = T.cad.filter(v => v > 0).sort((a, b) => a - b);
+  T.cadMed = cads.length ? cads[cads.length >> 1] : null;
   state.track = T;
 }
 
