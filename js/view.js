@@ -39,6 +39,7 @@ const COLS = [
   {key: 'clock', head: 'Uhrzeit', csv: 'Uhrzeit', fmt: fmtClock, raw: fmtClock},
   {key: 'speed', head: 'Tempo', csv: 'Tempo (km/h)', fmt: v => nf1.format(v * 3.6) + ' km/h', raw: v => (v * 3.6).toFixed(1),
     run: {head: 'Pace', csv: 'Pace (min/km)', fmt: v => paceSec(v) == null ? '–' : fmtPace(v) + ' /km', raw: v => paceSec(v) == null ? '' : fmtPace(v)}},
+  {key: 'split', head: 'Split-Pace', csv: 'Split-Pace (min/km)', fmt: v => paceSec(v) == null ? '–' : fmtPace(v) + ' /km', raw: v => paceSec(v) == null ? '' : fmtPace(v)},
   {key: 'hr', head: 'Puls', csv: 'Puls (bpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0)},
   {key: 'power', head: 'Leistung', csv: 'Leistung (W)', fmt: v => nf0.format(v) + ' W', raw: v => v.toFixed(0)},
   {key: 'cad', head: 'Kadenz', csv: 'Kadenz (rpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0),

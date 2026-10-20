@@ -250,6 +250,11 @@ function update() {
   const step = +$('interval').value * 1000;
   if (step) for (let d = step; d < total - 1; d += step) add(rowAt(locate(T.dist, d), 'km ' + nf0.format(d / 1000)));
   rows.sort((a, b) => a.dist - b.dist);
+  // Split: Schnitt seit dem vorigen Tabellenpunkt über die Laufzeit (in m/s, angezeigt als Pace)
+  if (isRun() && T.t) rows.forEach((r, k) => {
+    const p = rows[k - 1] || {dist: 0, moving: 0}, dt = r.moving - p.moving;
+    r.split = dt > 0 ? (r.dist - p.dist) / dt : null;
+  });
   state.rows = rows;
   $('customErr').textContent = bad.length ? 'Nicht erkannt oder außerhalb der Tour: ' + bad.join('  ') : '';
 
