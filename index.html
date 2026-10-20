@@ -155,6 +155,44 @@
       <div class="hint">„Kartenhintergrund“ lädt Kartenkacheln von OpenStreetMap; der Kartenserver erfährt dabei den Kartenausschnitt. Die Quellenangabe „© OpenStreetMap“ ist Pflicht: entweder klein in der Karte („© in der Karte“) oder an anderer Stelle im Video, z. B. im Abspann oder in der Beschreibung.</div>
       <div class="hint">In Premiere: ZIP entpacken, „Datei › Importieren“, das erste Bild auswählen und „Bildsequenz“ anhaken. Der Hintergrund ist transparent. Stimmt die Länge nicht, die Framerate über „Ändern › Filmmaterial interpretieren“ auf den Wert oben setzen.</div>
     </div>
+
+    <div class="card" id="pcCard">
+      <div class="tablehead"><h2>Postkarte</h2><span class="hint">Bild für Beiträge und Stories</span></div>
+      <div class="pcwrap">
+        <div>
+          <div class="ovgrid">
+            <div><label for="pcFormat">Format</label><select id="pcFormat"><option value="story">Story 9:16</option><option value="post" selected>Beitrag 4:5</option><option value="square">Quadrat 1:1</option></select></div>
+            <div><label for="pcLayout">Anordnung</label><select id="pcLayout"><option value="big">Strecke groß</option><option value="bottom">alles unten</option></select></div>
+            <div id="pcScopeWrap"><label for="pcScope">Abschnitt</label><select id="pcScope"></select></div>
+            <div class="wide"><label for="pcTitle">Titel</label><input id="pcTitle" type="text" placeholder="optional" autocomplete="off"></div>
+          </div>
+          <div class="ovgh">Inhalt</div>
+          <div class="ovchecks" id="pcChecks"></div>
+          <div class="ovgh">Hintergrund</div>
+          <div class="ovgrid">
+            <div><label for="pcBg">Hintergrund</label><select id="pcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color">Farbe</option></select></div>
+            <div><label for="pcBgCol">Farbe</label><input id="pcBgCol" type="color" value="#14181d"></div>
+            <div><label for="pcDim">Foto abdunkeln (%)</label><input id="pcDim" type="number" min="0" max="90" step="5" value="45"></div>
+            <div class="chk"><button id="pcPhotoBtn" type="button">Foto wählen</button><input id="pcPhoto" type="file" accept="image/*" hidden></div>
+          </div>
+          <div class="ovgh">Schrift &amp; Farben</div>
+          <div class="ovgrid">
+            <div><label for="pcFont">Schriftart</label><select id="pcFont"></select></div>
+            <div><label for="pcAccent">Akzent</label><input id="pcAccent" type="color" value="#ff6a1a"></div>
+            <div><label for="pcText">Text</label><input id="pcText" type="color" value="#ffffff"></div>
+            <div class="chk"><label><input type="checkbox" id="pcItalic">Kursiv</label></div>
+            <div class="chk"><label><input type="checkbox" id="pcUpper">Großbuchstaben</label></div>
+          </div>
+          <div class="inline ovbar">
+            <button id="pcSave">PNG speichern</button>
+            <button id="pcShare" hidden>Teilen …</button>
+            <span class="hint" id="pcInfo"></span>
+          </div>
+          <div class="hint">„Transparent“ ergibt einen Sticker, den du in der App über ein eigenes Foto oder Video legst. Ein Foto lässt sich auch einfach auf die Seite ziehen; es wird nur im Browser verarbeitet. Bei Stories bleibt oben und unten Platz für die Bedienelemente der App.</div>
+        </div>
+        <div class="pcpreview"><canvas id="pcCanvas"></canvas></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -164,6 +202,7 @@
 <script src="js/view.js"></script>
 <script src="js/overlay.js"></script>
 <script src="js/overlay-export.js"></script>
+<script src="js/postcard.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

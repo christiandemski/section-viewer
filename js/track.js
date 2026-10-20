@@ -262,5 +262,6 @@ function update() {
   renderChart();
   renderTable();
   ovRefresh();
+  pcRefresh();
 }
 

@@ -19,6 +19,12 @@ function fmtPace(mps) {
 const fmtClock = ms => new Date(ms).toLocaleTimeString('de-DE');
 const fmtClockShort = ms => new Date(ms).toLocaleTimeString('de-DE', {hour: '2-digit', minute: '2-digit'});
 
+// Vorbelegung der Formularfelder aus dem HTML, für „Standard“
+const defaultsOf = ids => Object.fromEntries(ids.map(id => {
+  const el = $(id);
+  return [id, el.type === 'checkbox' ? el.defaultChecked : el.tagName === 'SELECT' ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value : el.defaultValue];
+}));
+
 async function copyText(text) {
   try { await navigator.clipboard.writeText(text); }
   catch {

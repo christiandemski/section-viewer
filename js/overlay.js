@@ -61,10 +61,7 @@ function ovApply(saved, ids) {
 const ovStore = () => 'sectionviewer.overlay' + (isRun() ? '.run' : '');
 // Ausgangswerte: was im HTML vorbelegt ist, Werte in der Reihenfolge von OV_FIELDS; beim Laufen
 // Pace und Laufzeit statt Aufstieg in schmaler Schrift
-const OV_DEFAULTS = Object.fromEntries(OV_DESIGN.map(id => {
-  const el = $(id);
-  return [id, el.type === 'checkbox' ? el.defaultChecked : el.tagName === 'SELECT' ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value : el.defaultValue];
-}));
+const OV_DEFAULTS = defaultsOf(OV_DESIGN);
 const OV_RUN_DEFAULTS = {ovFont: 'Barlow Condensed', ovWeight: '700', ovUpper: true, ovf_asc: false, ovf_speed: true, ovf_moving: true,
   order: ['place', 'dist', 'speed', 'moving', 'avg', 'asc', 'elapsed', 'clock', 'hr', 'grade', 'ele', 'temp']};
 const ovDefaults = () => ({...OV_DEFAULTS, order: OV_FIELDS.map(f => f.id), ...(isRun() ? OV_RUN_DEFAULTS : {})});
