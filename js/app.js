@@ -193,7 +193,7 @@ async function loadJson(file) {
   if (saved && saved.type === SESSION_TYPE) loadSession(saved, file.name);
   else ovLoadDesign(file);
 }
-// Bilder sind Fotos für die Postkarte
+// Bilder sind Fotos für den Story-Creator
 function openFiles(files) {
   const images = files.filter(f => /^image\//.test(f.type));
   const jsons = files.filter(f => /\.json$/i.test(f.name)), tracks = files.filter(f => !jsons.includes(f) && !images.includes(f));

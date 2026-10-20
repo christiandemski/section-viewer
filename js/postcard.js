@@ -1,6 +1,6 @@
 'use strict';
 
-// Postkarte: ein Bild der Tour oder des Laufs für Beiträge und Stories, wahlweise transparent
+// Story-Creator: ein Bild der Tour oder des Laufs für Beiträge und Stories, wahlweise transparent
 // zum Darüberlegen, auf einem eigenen Foto oder auf einer Farbe. Das Foto bleibt im Browser.
 const PC_FORMATS = {story: [1080, 1920], post: [1080, 1350], square: [1080, 1080]};
 // Zeiten ab einer Stunde als h:mm, darunter als m:ss
