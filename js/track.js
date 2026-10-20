@@ -198,6 +198,9 @@ function parseCustom(text) {
   return {out, bad};
 }
 
+// Feste Punkte im Laufmodus; offizielle Streckenlängen
+const RACE_MARKS = [[5000, '5 km'], [10000, '10 km'], [21097.5, 'Halbmarathon'], [42195, 'Marathon']];
+
 function update() {
   const T = state.track, S = state.stages;
   $('app').hidden = !T;
@@ -241,6 +244,7 @@ function update() {
   const add = r => { if (!rows.some(x => Math.abs(x.dist - r.dist) < 1)) rows.push(r); };
   for (let k = 0; k < S.length - 1; k++) add(rowAt({i: S[k + 1].start - 1, f: 0}, 'Ende Tag ' + (k + 1)));
   add(rowAt({i: T.n - 1, f: 0}, 'Ziel'));
+  if (isRun() && $('race').checked) for (const [d, label] of RACE_MARKS) if (d < total - 1) add(rowAt(locate(T.dist, d), label));
   const {out, bad} = parseCustom($('custom').value);
   out.forEach(add);
   const step = +$('interval').value * 1000;

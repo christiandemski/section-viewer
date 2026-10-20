@@ -11,6 +11,7 @@ const SPORT = {
 function setSport(sport) {
   const S = SPORT[sport];
   if (!S) return;
+  const changed = sport !== state.sport;
   state.sport = sport;
   document.documentElement.dataset.sport = sport;
   for (const b of $('sport').querySelectorAll('button')) b.setAttribute('aria-pressed', b.dataset.sport === sport);
@@ -21,7 +22,8 @@ function setSport(sport) {
   const sel = $('interval');
   sel.innerHTML = '<option value="0">keine</option>' + S.intervals.map(k => `<option value="${k}">alle ${k} km</option>`).join('');
   sel.value = [...sel.options].some(o => o.value === v) ? v : S.interval;
-  ovSportLabels();
+  $('raceWrap').hidden = sport !== 'run';
+  ovSportChanged(changed);
 }
 $('sport').addEventListener('click', ev => {
   const b = ev.target.closest('button');
@@ -30,6 +32,11 @@ $('sport').addEventListener('click', ev => {
   update();
 });
 
+try { $('race').checked = localStorage.getItem('sectionviewer.race') !== '0'; } catch {}
+$('race').addEventListener('change', () => {
+  try { localStorage.setItem('sectionviewer.race', $('race').checked ? '1' : '0'); } catch {}
+  update();
+});
 $('interval').addEventListener('change', () => {
   try { localStorage.setItem(SPORT[state.sport].store, $('interval').value); } catch {}
   update();
@@ -129,7 +136,7 @@ $('sessionSave').addEventListener('click', async () => {
   const json = JSON.stringify({
     type: SESSION_TYPE, version: 1,
     files: await Promise.all(S.map(async s => ({name: s.name, data: await toBase64(s.buf)}))),
-    sport: state.sport, manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
+    sport: state.sport, race: $('race').checked, manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
     interval: $('interval').value, custom: $('custom').value, ovStart: $('ovStart').value,
     overlay: ovSettings(OV_SAVED), places: along(places), marks: along(marks),
   });
@@ -155,6 +162,7 @@ async function loadSession(saved, fileName) {
   if (!state.stages.length) { state.stages = before; $('status').textContent = errors.join(' · '); return; }
   // vor den Abschnitten, deren Auswahl von der Sportart abhängt; ältere Sessions haben keine Angabe
   setSport(Object.hasOwn(SPORT, saved.sport) ? saved.sport : state.stages[0].sport || state.sport);
+  if (typeof saved.race === 'boolean') $('race').checked = saved.race;
   // gespeicherte Reihenfolge beibehalten
   state.manualOrder = saved.manualOrder === true;
   if (Number.isFinite(saved.thr) && saved.thr >= 0) state.thr = saved.thr;

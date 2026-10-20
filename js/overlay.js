@@ -23,9 +23,10 @@ const OV_FIELDS = [
 ];
 $('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${bySport(f).label}</label>`).join('') +
   '<label><input type="checkbox" id="ovMap" checked>Karte</label><label><input type="checkbox" id="ovTiles">Kartenhintergrund</label><label><input type="checkbox" id="ovAttr" checked>© in der Karte</label><label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
-// Beschriftung der Häkchen nach einem Wechsel der Sportart
-function ovSportLabels() {
+// Nach einem Wechsel der Sportart: Beschriftung der Häkchen und, wenn gewünscht, deren Gestaltung
+function ovSportChanged(design) {
   for (const f of OV_FIELDS) $('ovf_' + f.id).nextSibling.textContent = bySport(f).label;
+  if (design) ovLoadStored(OV_DESIGN);
 }
 
 // Einstellungen merken
@@ -55,7 +56,25 @@ function ovApply(saved, ids) {
   const labels = [...$('ovChecks').querySelectorAll('.ovf')], rank = id => { const n = saved.order.indexOf(id); return n < 0 ? 1e9 : n; };
   labels.sort((a, b) => rank(a.dataset.f) - rank(b.dataset.f)).forEach(el => $('ovChecks').insertBefore(el, $('ovMap').parentNode));
 }
-try { ovApply(JSON.parse(localStorage.getItem('sectionviewer.overlay') || '{}'), OV_SAVED); } catch {}
+
+// Rad und Lauf haben je eine eigene Gestaltung; die Angaben zum Clip gelten für beide
+const ovStore = () => 'sectionviewer.overlay' + (isRun() ? '.run' : '');
+// Ausgangswerte: was im HTML vorbelegt ist, Werte in der Reihenfolge von OV_FIELDS; beim Laufen
+// Pace und Laufzeit statt Aufstieg in schmaler Schrift
+const OV_DEFAULTS = Object.fromEntries(OV_DESIGN.map(id => {
+  const el = $(id);
+  return [id, el.type === 'checkbox' ? el.defaultChecked : el.tagName === 'SELECT' ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value : el.defaultValue];
+}));
+const OV_RUN_DEFAULTS = {ovFont: 'Barlow Condensed', ovWeight: '700', ovUpper: true, ovf_asc: false, ovf_speed: true, ovf_moving: true,
+  order: ['place', 'dist', 'speed', 'moving', 'avg', 'asc', 'elapsed', 'clock', 'hr', 'grade', 'ele', 'temp']};
+const ovDefaults = () => ({...OV_DEFAULTS, order: OV_FIELDS.map(f => f.id), ...(isRun() ? OV_RUN_DEFAULTS : {})});
+function ovLoadStored(ids) {
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(ovStore())); } catch {}
+  ovApply(ovDefaults(), OV_DESIGN);
+  if (saved && typeof saved === 'object') ovApply(saved, ids);
+}
+ovLoadStored(OV_SAVED);
 
 const OV_DESIGN_TYPE = 'section-viewer-gestaltung';
 $('ovDesignSave').addEventListener('click', () => {
@@ -79,11 +98,8 @@ async function ovLoadDesign(file) {
   }
 }
 $('ovDesignLoad').addEventListener('click', () => $('ovDesignFile').click());
-// Ausgangswerte: was im HTML vorbelegt ist, Werte in der Reihenfolge von OV_FIELDS
 $('ovDesignReset').addEventListener('click', () => {
-  const def = el => el.type === 'checkbox' ? el.defaultChecked
-    : el.tagName === 'SELECT' ? ([...el.options].find(o => o.defaultSelected) || el.options[0]).value : el.defaultValue;
-  ovApply({...Object.fromEntries(OV_DESIGN.map(id => [id, def($(id))])), order: OV_FIELDS.map(f => f.id)}, OV_DESIGN);
+  ovApply(ovDefaults(), OV_DESIGN);
   $('ovDesignName').value = '';
   $('ovDesignMsg').textContent = 'Auf Standard zurückgesetzt.';
   ovRefresh();
@@ -146,15 +162,25 @@ function gradeAt(si, sDist) {
   return (e(b) - e(a)) / (b - a) * 100;
 }
 
+// Die Pace der Uhr schwankt beim Laufen stark; im Overlay daher der Schnitt über 15 s um den Punkt
+const OV_PACE_SPAN = 15000;
+function smoothSpeed(A, ms) {
+  const at = t => { const p = locate(A.t, t), j = Math.min(p.i + 1, A.n - 1); return [A.t[p.i] + p.f * (A.t[j] - A.t[p.i]), A.dist[p.i] + p.f * (A.dist[j] - A.dist[p.i])]; };
+  const [ta, da] = at(ms - OV_PACE_SPAN / 2), [tb, db] = at(ms + OV_PACE_SPAN / 2);
+  return tb - ta > 2000 ? (db - da) / ((tb - ta) / 1000) : null;
+}
+
 // Werte zur Videozeit tau (Sekunden nach Clipstart)
 function ovSample(c, tau) {
   const T = state.track;
   let r = c.r0;
   if (T.t) {
-    const s = state.stages[c.si], A = s.track, p = locate(A.t, c.t0 + tau * 1000 * c.speed);
+    const s = state.stages[c.si], A = s.track, ms = c.t0 + tau * 1000 * c.speed, p = locate(A.t, ms);
     const i = s.start + p.i, j = Math.min(i + 1, s.start + A.n - 1);
     r = rowAt({i, f: p.f}, '');
-    if (T.speed[i] != null && T.speed[j] != null) r.speed = T.speed[i] + p.f * (T.speed[j] - T.speed[i]);
+    const smooth = isRun() ? smoothSpeed(A, ms) : null;
+    if (smooth != null) r.speed = smooth;
+    else if (T.speed[i] != null && T.speed[j] != null) r.speed = T.speed[i] + p.f * (T.speed[j] - T.speed[i]);
     if (T.lat[i] != null && T.lat[j] != null && T.lon[i] != null && T.lon[j] != null) {
       r.lat = T.lat[i] + p.f * (T.lat[j] - T.lat[i]);
       r.lon = T.lon[i] + p.f * (T.lon[j] - T.lon[i]);
@@ -528,7 +554,7 @@ function ovRefresh() {
   for (const o of wsel.options) if (o.value[0] === 'c') o.disabled = !os;
   if (!os && wsel.value[0] === 'c') wsel.value = wsel.value.slice(1);
   try {
-    localStorage.setItem('sectionviewer.overlay', JSON.stringify(ovSettings(OV_SAVED)));
+    localStorage.setItem(ovStore(), JSON.stringify(ovSettings(OV_SAVED)));
   } catch {}
   const c = ov.cfg = ovConfig();
   if (!c) return;
