@@ -263,5 +263,6 @@ function update() {
   renderTable();
   ovRefresh();
   pcRefresh();
+  dcRefresh();
 }
 

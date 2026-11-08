@@ -46,8 +46,8 @@ const pc = {photo: null, raf: 0, fonts: new Set()};
 const mercY = lat => { const p = lat * Math.PI / 180; return (1 - Math.log(Math.tan(p) + 1 / Math.cos(p)) / Math.PI) / 2; };
 
 // Kennzahlen, Strecke und Profil für die ganze Tour oder einen Tag
-function pcData() {
-  const T = state.track, S = state.stages, sc = $('pcScope').value;
+function pcData(sc = $('pcScope').value) {
+  const T = state.track, S = state.stages;
   const st = sc === 'tour' ? null : S[+sc] || null;
   const a = st ? st.start : 0, b = st ? st.start + st.track.n - 1 : T.n - 1;
   const d = {dist: T.dist[b] - T.dist[a], asc: state.asc[b] - state.asc[a], moving: 0, elapsed: 0, hr: null};

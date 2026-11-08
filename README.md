@@ -12,6 +12,7 @@ Kleine Web-App, die Kilometer und Höhenmeter einer Rad- oder Wandertour bis zu 
 - **Export** der Tabelle in die Zwischenablage oder als CSV.
 - **Overlay für Videos**: Zähler, Mini-Karte und Höhenprofil als PNG-Sequenz (ZIP) oder Einzelbild, für 1080p oder 4K, mit Zeitraffer. Layout, Schrift, Farben und Karte lassen sich gestalten und als Vorlage (`.json`) speichern.
 - **Story-Creator**: ein Bild der Tour oder des Laufs für Beiträge und Stories (9:16, 4:5, 1:1) mit Strecke, Höhenprofil, Titel, Datum und Kennzahlen. Hintergrund transparent (als Sticker), eigenes Foto (wird nur im Browser verarbeitet, auch per Ziehen auf die Seite) oder Farbe. Speichern als PNG oder auf dem Handy direkt teilen. Die Gestaltung wird je Sportart gemerkt.
+- **Tageskarte**: bildfüllende Zwischenkarte im Format 16:9 (HD oder 4K) für Videos, je Tag oder für die ganze Tour, mit Titel („Tag 3“), Start → Ziel, Datum, Kennzahlen, Strecke und Höhenprofil in drei Anordnungen. Start und Ziel kommen aus den Ortsnamen der Tabelle (bei Bedarf nur diese Punkte abrufen) oder werden von Hand eingetragen. Hintergrund transparent (als Ebene in Premiere), eigenes Foto oder Farbe. Speichern als PNG oder alle Tage auf einmal als ZIP. Die Gestaltung wird je Sportart gemerkt.
 - **Session speichern**: Dateien, eigene Punkte, Einstellungen und Ortsnamen in einer `_session.json` sichern. Um später oder auf einem anderen Gerät weiterzumachen, die Datei einfach auf die Seite ziehen.
 
 - **Rad oder Lauf**: Umschalter oben rechts. Im Laufmodus zeigt die Seite Pace (min/km) statt km/h, Laufzeit statt Fahrzeit, Schritte pro Minute statt Kadenz, eine Spalte Split-Pace (Pace seit dem vorigen Tabellenpunkt) und Abschnitte ab 1 km, in eigenem Design. Dazu kommen Wettkampf-Marken (5 km, 10 km, Halbmarathon, Marathon), eine eigene Overlay-Gestaltung (Rad und Lauf merken sich ihre Gestaltung getrennt) und im Overlay eine über 15 s geglättete Pace. FIT- und GPX-Dateien, die ihre Sportart angeben, schalten beim Öffnen einer neuen Tour automatisch um; die Wahl wird gemerkt und in der Session gespeichert.
@@ -50,6 +51,7 @@ Danach `http://localhost:8000` öffnen.
 | `js/overlay.js` | Overlay: Einstellungen, Vorlagen, Zeichnen, Vorschau |
 | `js/overlay-export.js` | PNG- und ZIP-Export der Overlays |
 | `js/postcard.js` | Story-Creator: Bild für Beiträge und Stories |
+| `js/daycard.js` | Tageskarte: Zwischenkarte für Videos, einzeln oder alle Tage als ZIP |
 | `js/app.js` | Dateien laden, Session, Ereignisse |
 | `.htaccess` | Zugriffsschutz und Caching auf dem Webspace |
 

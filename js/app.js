@@ -25,6 +25,7 @@ function setSport(sport) {
   $('raceWrap').hidden = sport !== 'run';
   ovSportChanged(changed);
   pcSportChanged(changed);
+  dcSportChanged(changed);
 }
 $('sport').addEventListener('click', ev => {
   const b = ev.target.closest('button');
@@ -69,7 +70,7 @@ $('reset').addEventListener('click', () => {
   state.manualOrder = false;
   $('custom').value = '';
   $('ovStart').value = '';
-  $('pcTitle').value = '';
+  for (const id of ['pcTitle', ...DC_TEXTS]) $(id).value = '';
   combine();
   update();
 });
@@ -140,7 +141,8 @@ $('sessionSave').addEventListener('click', async () => {
     files: await Promise.all(S.map(async s => ({name: s.name, data: await toBase64(s.buf)}))),
     sport: state.sport, race: $('race').checked, manualOrder: state.manualOrder, thr: state.thr, auto: state.auto,
     interval: $('interval').value, custom: $('custom').value, ovStart: $('ovStart').value,
-    overlay: ovSettings(OV_SAVED), postcard: pcSettings(), pcTitle: $('pcTitle').value, places: along(places), marks: along(marks),
+    overlay: ovSettings(OV_SAVED), postcard: pcSettings(), pcTitle: $('pcTitle').value,
+    daycard: dcSettings(), ...Object.fromEntries(DC_TEXTS.map(id => [id, $(id).value])), places: along(places), marks: along(marks),
   });
   download(new Blob([json], {type: 'application/json'}), (multi() ? 'tour' : S[0].name.replace(/\.[^.]+$/, '')) + '_session.json');
 });
@@ -169,13 +171,14 @@ async function loadSession(saved, fileName) {
   state.manualOrder = saved.manualOrder === true;
   if (Number.isFinite(saved.thr) && saved.thr >= 0) state.thr = saved.thr;
   if (typeof saved.auto === 'boolean') state.auto = saved.auto;
-  for (const id of ['custom', 'ovStart', 'pcTitle']) $(id).value = typeof saved[id] === 'string' ? saved[id] : '';
+  for (const id of ['custom', 'ovStart', 'pcTitle', ...DC_TEXTS]) $(id).value = typeof saved[id] === 'string' ? saved[id] : '';
   if ([...$('interval').options].some(o => o.value === saved.interval)) {
     $('interval').value = saved.interval;
     try { localStorage.setItem(SPORT[state.sport].store, saved.interval); } catch {}
   }
   if (saved.overlay && typeof saved.overlay === 'object') ovApply(saved.overlay, OV_SAVED);
   if (saved.postcard && typeof saved.postcard === 'object') ovApply(saved.postcard, PC_SAVED);
+  if (saved.daycard && typeof saved.daycard === 'object') ovApply(saved.daycard, DC_SAVED);
   // Ortsnamen nur ergänzen; eigene Korrekturen in diesem Browser haben Vorrang
   for (const [k, v] of Object.entries(saved.places || {})) if (typeof v === 'string' && v && !(k in places)) places[k] = v;
   for (const k of Object.keys(saved.marks || {})) marks[k] = 1;
@@ -193,7 +196,7 @@ async function loadJson(file) {
   if (saved && saved.type === SESSION_TYPE) loadSession(saved, file.name);
   else ovLoadDesign(file);
 }
-// Bilder sind Fotos für den Story-Creator
+// Bilder sind Fotos für den Story-Creator; die Tageskarte wählt ihr Foto über den eigenen Knopf
 function openFiles(files) {
   const images = files.filter(f => /^image\//.test(f.type));
   const jsons = files.filter(f => /\.json$/i.test(f.name)), tracks = files.filter(f => !jsons.includes(f) && !images.includes(f));

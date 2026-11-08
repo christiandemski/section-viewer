@@ -193,6 +193,50 @@
         <div class="pcpreview"><canvas id="pcCanvas"></canvas></div>
       </div>
     </div>
+
+    <div class="card" id="dcCard">
+      <div class="tablehead"><h2>Tageskarte</h2><span class="hint">Zwischenkarte für Videos, 16:9</span></div>
+      <div class="pcwrap dcwrap">
+        <div>
+          <div class="ovgrid">
+            <div class="wide"><label for="dcLayout">Anordnung</label><select id="dcLayout"><option value="split" selected>Zahlen links, Strecke rechts</option><option value="center">Titel mittig, Zahlen unten</option><option value="map">Strecke groß, Leiste unten</option></select></div>
+            <div><label for="dcRes">Auflösung</label><select id="dcRes"><option value="4k" selected>3840 × 2160</option><option value="hd">1920 × 1080</option></select></div>
+            <div id="dcScopeWrap"><label for="dcScope">Abschnitt</label><select id="dcScope"></select></div>
+            <div class="wide"><label for="dcTitle">Titel</label><input id="dcTitle" type="text" placeholder="optional" autocomplete="off"></div>
+            <div class="wide"><label for="dcSub">Untertitel</label><input id="dcSub" type="text" placeholder="z. B. Via Claudia Augusta" autocomplete="off"></div>
+            <div class="wide"><label for="dcFrom">Start</label><input id="dcFrom" type="text" autocomplete="off"></div>
+            <div class="wide"><label for="dcTo">Ziel</label><input id="dcTo" type="text" autocomplete="off"></div>
+          </div>
+          <div class="inline ovbar"><button id="dcPlaces" type="button" hidden>Start und Ziel abrufen</button><span class="hint" id="dcPlaceProg"></span></div>
+          <div class="hint">Start und Ziel kommen aus der Tabelle. „Start und Ziel abrufen“ sendet nur die Koordinaten von Start und Ziel jeder Etappe an OpenStreetMap (Nominatim); die Namen landen in der Tabelle und lassen sich dort korrigieren. Die Felder oben überschreiben sie nur für diese Karte.</div>
+          <div class="ovgh">Inhalt</div>
+          <div class="ovchecks" id="dcChecks"></div>
+          <div class="hint">Höchstens vier Kennzahlen; sind mehr angehakt, erscheinen die ersten vier.</div>
+          <div class="ovgh">Hintergrund</div>
+          <div class="ovgrid">
+            <div><label for="dcBg">Hintergrund</label><select id="dcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color" selected>Farbe</option></select></div>
+            <div><label for="dcBgCol">Farbe</label><input id="dcBgCol" type="color" value="#14181d"></div>
+            <div><label for="dcDim">Foto abdunkeln (%)</label><input id="dcDim" type="number" min="0" max="90" step="5" value="45"></div>
+            <div class="chk"><button id="dcPhotoBtn" type="button">Foto wählen</button><input id="dcPhoto" type="file" accept="image/*" hidden></div>
+          </div>
+          <div class="ovgh">Schrift &amp; Farben</div>
+          <div class="ovgrid">
+            <div><label for="dcFont">Schriftart</label><select id="dcFont"></select></div>
+            <div><label for="dcAccent">Akzent</label><input id="dcAccent" type="color" value="#ff6a1a"></div>
+            <div><label for="dcText">Text</label><input id="dcText" type="color" value="#ffffff"></div>
+            <div class="chk"><label><input type="checkbox" id="dcItalic">Kursiv</label></div>
+            <div class="chk"><label><input type="checkbox" id="dcUpper">Großbuchstaben</label></div>
+          </div>
+          <div class="inline ovbar">
+            <button id="dcSave">PNG speichern</button>
+            <button id="dcZip" hidden>Alle Tage als ZIP</button>
+            <span class="hint" id="dcInfo"></span>
+          </div>
+          <div class="hint">„Transparent“ ergibt eine Ebene, die du in Premiere über das Video legst. „Alle Tage als ZIP“ speichert eine Karte je Etappe; Titel, Start und Ziel aus den Feldern oben gelten dabei nur für den gewählten Tag. Ein auf die Seite gezogenes Foto geht an den Story-Creator, für die Tageskarte „Foto wählen“ nutzen; es wird nur im Browser verarbeitet.</div>
+        </div>
+        <div class="pcpreview"><canvas id="dcCanvas"></canvas></div>
+      </div>
+    </div>
   </div>
 </main>
 
@@ -203,6 +247,7 @@
 <script src="js/overlay.js"></script>
 <script src="js/overlay-export.js"></script>
 <script src="js/postcard.js"></script>
+<script src="js/daycard.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

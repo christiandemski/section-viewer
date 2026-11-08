@@ -86,7 +86,26 @@ $('tbody').addEventListener('change', ev => {
   } else if (key) setPlace(key, ev.target.value.trim(), ev.target);
   else return;
   ovRefresh();
+  dcRefresh();
 });
+
+// Ortsname eines Punkts (Schlüssel wie placeKey) von Nominatim. Anfragen laufen nacheinander,
+// höchstens eine pro Sekunde, wie Nominatim es verlangt – auch wenn Tabelle und Tageskarte gleichzeitig abrufen
+let placeQueue = Promise.resolve(), placeLast = 0;
+function fetchPlace(key) {
+  const job = placeQueue.then(async () => {
+    const wait = placeLast + 1100 - Date.now();
+    if (wait > 0) await new Promise(r => setTimeout(r, wait));
+    placeLast = Date.now();
+    const [lat, lon] = key.split(',');
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=de&lat=${lat}&lon=${lon}`);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const a = (await res.json()).address || {};
+    return a.village || a.town || a.city || a.hamlet || a.suburb || a.municipality || a.county || '';
+  });
+  placeQueue = job.catch(() => {});
+  return job;
+}
 
 let placeRun = 0;
 $('places').addEventListener('click', async ev => {
@@ -100,15 +119,9 @@ $('places').addEventListener('click', async ev => {
   try {
     for (const [n, key] of todo.entries()) {
       prog.textContent = `Ort ${n + 1} von ${todo.length} …`;
-      const [lat, lon] = key.split(',');
-      const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=14&accept-language=de&lat=${lat}&lon=${lon}`);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const a = (await res.json()).address || {};
-      const name = a.village || a.town || a.city || a.hamlet || a.suburb || a.municipality || a.county || '';
+      const name = await fetchPlace(key);
       if (placeRun !== run) break;
-      if (name && !(key in places)) { setPlace(key, name); found++; ovRefresh(); }
-      // Nominatim erlaubt höchstens eine Anfrage pro Sekunde
-      if (n < todo.length - 1) await new Promise(r => setTimeout(r, 1100));
+      if (name && !(key in places)) { setPlace(key, name); found++; ovRefresh(); dcRefresh(); }
     }
     prog.textContent = placeRun !== run ? 'Abgebrochen.' : `${found} von ${todo.length} Orten gefunden.`;
   } catch (e) {
