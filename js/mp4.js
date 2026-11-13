@@ -64,16 +64,19 @@ function muxMp4({width, height, fps, avcC, samples}) {
 
 // Kodiert n Bilder, die draw(canvas, i) zeichnet, als H.264 und liefert ein MP4.
 // progress(i) meldet den Fortschritt; cancelled() bricht ab (Ergebnis null).
-async function encodeMp4(canvas, {fps, frames, draw, progress = () => {}, cancelled = () => false, bitrate = 10e6}) {
+async function encodeMp4(canvas, {fps, frames, draw, progress = () => {}, cancelled = () => false, bitrate}) {
   if (typeof VideoEncoder === 'undefined') throw new Error('Dieser Browser kann keine Videos erzeugen. Bitte eine aktuelle Version von Chrome, Edge oder Safari verwenden.');
   const width = canvas.width, height = canvas.height;
-  // High, Main oder Baseline Profile, jeweils Level 4.0 (bis 1080 × 1920 bei 30 Bildern/s)
+  // High, Main oder Baseline Profile; Level 4.0 reicht bis 1920 × 1080 bzw. 1080 × 1920, 4K braucht Level 5.1
+  const mbs = Math.ceil(width / 16) * Math.ceil(height / 16), level = mbs <= 8192 ? '28' : mbs <= 36864 ? '33' : '34';
+  bitrate = bitrate || (mbs > 8192 ? 35e6 : 10e6);
   let config = null;
-  for (const codec of ['avc1.640028', 'avc1.4d0028', 'avc1.420028']) {
+  for (const codec of ['6400', '4d00', '4200'].map(p => 'avc1.' + p + level)) {
     const c = {codec, width, height, bitrate, framerate: fps, avc: {format: 'avc'}, latencyMode: 'quality'};
     try { if ((await VideoEncoder.isConfigSupported(c)).supported) { config = c; break; } } catch {}
   }
-  if (!config) throw new Error('Dieser Browser kann kein H.264-Video (MP4) kodieren. Bitte eine aktuelle Version von Chrome, Edge oder Safari verwenden.');
+  if (!config) throw new Error(mbs > 8192 ? 'Dieser Browser kann kein 4K-Video kodieren – bitte die Auflösung 1920 × 1080 wählen.'
+    : 'Dieser Browser kann kein H.264-Video (MP4) kodieren. Bitte eine aktuelle Version von Chrome, Edge oder Safari verwenden.');
 
   const samples = [];
   let avcC = null, failure = null, lastTs = -1;

@@ -339,6 +339,15 @@
             <div class="hint">Höchstens vier Kennzahlen; sind mehr angehakt, erscheinen die ersten vier.</div>
           </details>
 
+          <details class="group" open>
+            <summary>Animation</summary>
+            <div class="chips"><label class="chip"><input type="checkbox" id="dcAnim">Animiert – Texte und Werte erscheinen nacheinander</label></div>
+            <div class="grid" id="dcDurWrap">
+              <div><label for="dcDur">Dauer</label><select id="dcDur"><option value="5">5 s</option><option value="6" selected>6 s</option><option value="8">8 s</option><option value="10">10 s</option></select></div>
+            </div>
+            <div class="hint">Strecke und Profil zeichnen sich, die Zahlen zählen hoch; danach steht die fertige Karte bis zum Ende. Mit Farbe oder Foto entsteht ein MP4-Video (H.264, 30 Bilder/s). Mit transparentem Hintergrund eine PNG-Sequenz (ZIP), die in Premiere als Ebene über das Video kommt: ZIP entpacken, erstes Bild importieren und „Bildsequenz“ anhaken.</div>
+          </details>
+
           <details class="group">
             <summary>Hintergrund</summary>
             <div class="grid">
@@ -367,10 +376,17 @@
         <div class="stage-col">
           <div class="card preview-card">
             <div class="exports">
+              <button id="dcAnimSave" class="primary">Video speichern (MP4)</button>
               <button id="dcSave" class="primary">PNG speichern</button>
               <button id="dcZip" hidden title="Eine Karte je Etappe; Titel, Start und Ziel aus den Feldern gelten nur für den gewählten Tag">Alle Tage als ZIP</button>
             </div>
+            <div class="hint" id="dcProg" role="status"></div>
             <div class="pcpreview"><canvas id="dcCanvas" aria-label="Vorschau der Tageskarte"></canvas></div>
+            <div class="player" id="dcPlayer">
+              <button id="dcPlay" class="icon" title="Animation abspielen" aria-label="Animation abspielen">▶</button>
+              <input id="dcSlider" type="range" min="0" max="6" step="any" value="6" aria-label="Zeitpunkt in der Animation">
+              <span id="dcTime"></span>
+            </div>
             <div class="hint" id="dcInfo" role="status"></div>
           </div>
         </div>

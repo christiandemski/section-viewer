@@ -11,7 +11,7 @@ $('dcChecks').innerHTML = DC_PARTS.map(([id, label]) => `<label><input type="che
 $('dcFont').innerHTML = $('ovFont').innerHTML;
 
 // Gestaltung je Sportart merken; Titel, Untertitel, Start und Ziel gehören zur Tour und stehen nur in der Session
-const DC_SAVED = ['dcLayout', 'dcRes', 'dcBg', 'dcBgCol', 'dcDim', 'dcFont', 'dcAccent', 'dcText', 'dcItalic', 'dcUpper',
+const DC_SAVED = ['dcLayout', 'dcRes', 'dcBg', 'dcBgCol', 'dcDim', 'dcFont', 'dcAccent', 'dcText', 'dcItalic', 'dcUpper', 'dcAnim', 'dcDur',
   ...DC_PARTS.map(p => 'dc_' + p[0]), ...PC_STATS.map(f => 'dcs_' + f.id)];
 const DC_TEXTS = ['dcTitle', 'dcSub', 'dcFrom', 'dcTo'];
 const DC_DEFAULTS = defaultsOf(DC_SAVED);
@@ -31,7 +31,16 @@ function dcSportChanged(design) {
   if (design) dcLoadStored();
 }
 
-const dc = {photo: null, raf: 0, fonts: new Set(), busy: false, placeRun: 0};
+const dc = {photo: null, raf: 0, fonts: new Set(), busy: false, placeRun: 0, play: 0, cancel: false, animEnd: 0};
+const dcDur = () => +$('dcDur').value || 6;
+const dcAnimated = () => $('dcAnim').checked;
+// Start und Dauer (s) je Element: Titel, Orte, Datum, dann Strecke und Profil, dann die Werte nacheinander
+function dcTimeline(n, route, profile) {
+  const T = {title: [0.2, 0.6], place: [0.45, 0.7], date: [0.7, 0.6], route: [0.8, 2.2], profile: [1.2, 1.6]};
+  const s0 = route || profile ? 1.8 : 1.1;
+  for (let i = 0; i < n; i++) { T['stat' + i] = [s0 + i * 0.3, 0.6]; T['count' + i] = [s0 + i * 0.3, 1.4]; }
+  return T;
+}
 
 // Erster und letzter Punkt mit Koordinaten im Abschnitt ('tour' oder Index der Etappe)
 function dcEnds(sc) {
@@ -57,7 +66,8 @@ function dcData(sc, own = true) {
 const dcChars = d => { const t = [d.title, d.from, d.to, d.sub, d.date || ''].join(''); return t + t.toUpperCase(); };
 
 // Zeichnet in einem Raster von 1920 × 1080; bei 4K wird nur skaliert, damit beide Größen gleich aussehen
-function dcDraw(cv, d, res = $('dcRes').value) {
+// t: Zeit in der Animation (s) oder null für die fertige Karte
+function dcDraw(cv, d, res = $('dcRes').value, t = null) {
   const [W, H] = DC_RES[res] || DC_RES['4k'], u = W / 1920, GW = 1920, GH = 1080;
   cv.width = W; cv.height = H;
   const g = cv.getContext('2d');
@@ -87,6 +97,15 @@ function dcDraw(cv, d, res = $('dcRes').value) {
   const stats = PC_STATS.filter(f => $('dcs_' + f.id).checked && (!f.need || d.has[f.need])).map(bySport).slice(0, 4);
   const title = d.title.toUpperCase(), from = places ? up(d.from) : '', to = places ? up(d.to) : '';
   const line2 = [date && d.date, d.sub].filter(Boolean).join(' · ');
+  // Animation: Fortschritt je Element; Einblenden mit Deckkraft und kleinem Versatz nach oben
+  const TL = dcTimeline(stats.length, route, profile);
+  dc.animEnd = Math.max(...Object.values(TL).map(([s, l]) => s + l));
+  const A = k => { if (t == null) return 1; const e = TL[k]; return e ? (t - e[0]) / e[1] : 1; };
+  const reveal = (key, fn) => {
+    const e = ease(A(key));
+    if (e <= 0) return;
+    g.save(); g.globalAlpha = e; g.translate(0, (1 - e) * 30); fn(); g.restore();
+  };
 
   // Bausteine für einen senkrechten Stapel: asc/desc = Ausdehnung über und unter der Grundlinie
   const textItem = (k, t, w, px, color, max, x, align = 'left') => {
@@ -118,8 +137,8 @@ function dcDraw(cv, d, res = $('dcRes').value) {
       vpx = Math.min(vpx, vmax * (cw - 40) / (at || 1));
     }
     const lab = vpx * 0.28, x0 = center ? GW / 2 - stats.length * cw / 2 : x;
-    return {k: 'stats', asc: vpx * 0.72, desc: vpx * 0.2 + lab * 1.22, draw: y => stats.forEach((f, n) => {
-      const [v, un] = f.val(d), cx = x0 + n * cw;
+    return {k: 'stats', own: true, asc: vpx * 0.72, desc: vpx * 0.2 + lab * 1.22, draw: y => stats.forEach((f, n) => reveal('stat' + n, () => {
+      const [v, un] = f.val(pcScaled(d, ease(A('count' + n)))), cx = x0 + n * cw;
       const vw = width(font(800, vpx, true), v), uw = un ? vpx * 0.08 + width(font(600, vpx * 0.4), un) : 0;
       const vx = center ? cx + (cw - vw - uw) / 2 : cx;
       g.textAlign = 'left';
@@ -127,9 +146,13 @@ function dcDraw(cv, d, res = $('dcRes').value) {
       if (un) { g.font = font(600, vpx * 0.4); g.fillStyle = accent; g.fillText(un, vx + vw + vpx * 0.08, y); }
       g.font = font(400, lab); g.fillStyle = rgba(text, 0.7); g.textAlign = center ? 'center' : 'left';
       g.fillText(up(f.label), center ? cx + cw / 2 : cx, y + vpx * 0.2 + lab, cw - 20);
-    })};
+    }))};
   };
-  const profileItem = (x, w, h) => ({k: 'profile', asc: 0, desc: h, draw: y => {
+  const profileItem = (x, w, h) => ({k: 'profile', own: true, asc: 0, desc: h, draw: y => {
+    const p = ease(A('profile'));
+    if (p <= 0) return;
+    g.save();
+    g.beginPath(); g.rect(x - 10, y - 20, (w + 20) * p, h + 40); g.clip();
     const ys = d.prof, n = ys.length - 1;
     let lo = Math.min(...ys), hi = Math.max(...ys);
     if (hi - lo < 20) hi = lo + 20;
@@ -141,13 +164,19 @@ function dcDraw(cv, d, res = $('dcRes').value) {
     g.beginPath(); g.moveTo(x, y + h); g.lineTo(x + w, y + h); g.lineWidth = 2; g.strokeStyle = rgba(text, 0.4); g.stroke();
     shadow(true);
     trace(); g.lineWidth = 4; g.lineJoin = 'round'; g.strokeStyle = accent; g.stroke();
+    g.restore();
   }});
   // Stapelt die Bausteine mittig um mid; Abstände je nach Nachbar aus G (vorher>nachher, sonst nach dem Baustein)
   const stack = (items, mid, G) => {
     if (!items.length) return;
     const adv = items.map((it, k) => k ? items[k - 1].desc + (G[items[k - 1].k + '>' + it.k] ?? G[it.k] ?? 40) + it.asc : 0);
     let y = mid - (items[0].asc + adv.reduce((a, b) => a + b, 0) + items.at(-1).desc) / 2 + items[0].asc;
-    items.forEach((it, k) => { y += adv[k]; shadow(true); it.draw(y); });
+    items.forEach((it, k) => {
+      y += adv[k];
+      shadow(true);
+      // Werte und Profil steuern ihre Animation selbst
+      if (it.own) it.draw(y); else { const yy = y; reveal(it.k, () => it.draw(yy)); }
+    });
   };
 
   // Strecke: Seitenverhältnis beibehalten und im Feld zentriert; dunkle Kontur unter der Linie
@@ -157,9 +186,14 @@ function dcDraw(cv, d, res = $('dcRes').value) {
     const m = lw * 2, sc = Math.min((w - 2 * m) / Math.max(x1 - x0, 1e-12), (h - 2 * m) / Math.max(y1 - y0, 1e-12));
     const ox = x + (w - (x1 - x0) * sc) / 2, oy = y + (h - (y1 - y0) * sc) / 2;
     const P = d.route.map(([px, py]) => [ox + (px - x0) * sc, oy + (py - y0) * sc]);
+    const pr = ease(A('route'));
+    if (pr <= 0) return;
+    const k = Math.max(1, Math.round(pr * (P.length - 1)));
+    const path = j => { g.beginPath(); for (let i = 0; i <= j; i++) g[i ? 'lineTo' : 'moveTo'](P[i][0], P[i][1]); };
+    g.save();
     g.lineJoin = g.lineCap = 'round';
-    g.beginPath();
-    P.forEach((p, i) => g[i ? 'lineTo' : 'moveTo'](p[0], p[1]));
+    if (k < P.length - 1) { shadow(false); path(P.length - 1); g.lineWidth = lw; g.strokeStyle = rgba(text, 0.22 * Math.min(1, pr * 3)); g.stroke(); }
+    path(k);
     shadow(true);
     g.lineWidth = lw * 1.9; g.strokeStyle = 'rgba(0,0,0,.35)'; g.stroke();
     shadow(false);
@@ -169,7 +203,8 @@ function dcDraw(cv, d, res = $('dcRes').value) {
       g.fillStyle = fill; g.fill(); g.lineWidth = lw * 0.6; g.strokeStyle = ring; g.stroke();
     };
     dot(P[0], '#ffffff', accent);
-    dot(P[P.length - 1], accent, '#ffffff');
+    dot(P[k], accent, '#ffffff');
+    g.restore();
   };
 
   // Ränder mindestens 150 links und rechts, 120 oben und unten (Title-Safe)
@@ -235,10 +270,18 @@ function dcRender() {
   $('dcFrom').placeholder = d.auto.from || 'Ort';
   $('dcTo').placeholder = d.auto.to || 'Ort';
   $('dcPlaces').hidden = !dc.placeRun && (!state.track.hasGps || !!(d.from && d.to));
+  const anim = dcAnimated(), slider = $('dcSlider');
+  $('dcPlayer').hidden = $('dcDurWrap').hidden = $('dcAnimSave').hidden = !anim;
+  $('dcSave').classList.toggle('primary', !anim);
+  // MP4 kennt keine Transparenz; transparent gibt es die Animation als PNG-Sequenz
+  if (!dc.busy) $('dcAnimSave').textContent = $('dcBg').value === 'none' ? 'PNG-Sequenz speichern (ZIP)' : 'Video speichern (MP4)';
+  if (+slider.max !== dcDur()) { slider.max = dcDur(); slider.value = dcDur(); }
+  const t = anim ? Math.min(dcDur(), +slider.value) : null;
+  $('dcTime').textContent = (t ?? 0).toFixed(1).replace('.', ',') + ' s';
   const cv = $('dcCanvas');
-  dcDraw(cv, d);
+  dcDraw(cv, d, undefined, t);
   $('dcInfo').textContent = `${cv.width} × ${cv.height} px` + ($('dcBg').value === 'photo' && !dc.photo ? ' · noch kein Foto gewählt' : '');
-  dcFonts(dcChars(d)).then(fresh => { if (fresh) dcRefresh(); });
+  if (!dc.play) dcFonts(dcChars(d)).then(fresh => { if (fresh) dcRefresh(); });
 }
 function dcRefresh() {
   if (!state.track) return;
@@ -254,7 +297,28 @@ function dcRefresh() {
   try { localStorage.setItem(dcStore(), JSON.stringify(dcSettings())); } catch {}
   if (!dc.raf) dc.raf = requestAnimationFrame(dcRender);
 }
-$('dcCard').addEventListener('input', ev => { if (ev.target.id !== 'dcPhoto') dcRefresh(); });
+$('dcCard').addEventListener('input', ev => {
+  if (ev.target.id === 'dcPhoto') return;
+  if (ev.target.id === 'dcSlider') { dcStop(); dcRender(); return; }
+  dcRefresh();
+});
+
+// Vorschau abspielen; endet auf der fertigen Karte
+function dcStop() { cancelAnimationFrame(dc.play); dc.play = 0; $('dcPlay').textContent = '▶'; $('dcPlay').setAttribute('aria-label', 'Animation abspielen'); }
+$('dcPlay').addEventListener('click', () => {
+  if (dc.play) { dcStop(); return; }
+  const slider = $('dcSlider'), from = +slider.value >= dcDur() - 0.05 ? 0 : +slider.value, t0 = performance.now();
+  $('dcPlay').textContent = '❚❚';
+  $('dcPlay').setAttribute('aria-label', 'Animation anhalten');
+  const tick = () => {
+    const t = from + (performance.now() - t0) / 1000;
+    slider.value = Math.min(t, dcDur());
+    dcRender();
+    if (t >= dcDur()) { dcStop(); return; }
+    dc.play = requestAnimationFrame(tick);
+  };
+  dc.play = requestAnimationFrame(tick);
+});
 
 // Holt nur die Orte an Start und Ziel jeder Etappe (die der ganzen Tour sind darin enthalten)
 $('dcPlaces').addEventListener('click', async ev => {
@@ -328,5 +392,55 @@ $('dcZip').addEventListener('click', async ev => {
   } finally {
     dc.busy = btn.disabled = false;
     btn.textContent = label;
+  }
+});
+
+// Animierte Karte des gewählten Abschnitts: MP4 bei Farbe oder Foto, PNG-Sequenz (mit Transparenz) bei transparentem Hintergrund
+$('dcAnimSave').addEventListener('click', async ev => {
+  const btn = ev.currentTarget, prog = $('dcProg');
+  if (dc.busy) { if (dc.busy === btn) dc.cancel = true; return; }
+  if (!state.track) return;
+  dcStop();
+  dc.busy = btn; dc.cancel = false;
+  const label = btn.textContent;
+  btn.textContent = 'Abbrechen';
+  try {
+    const sc = $('dcScope').value, d = dcData(sc), stem = dcName(sc).replace(/\.png$/, '');
+    await dcFonts(dcChars(d));
+    const frames = Math.round(dcDur() * PC_FPS), canvas = document.createElement('canvas');
+    dcDraw(canvas, d);
+    const step = i => { if (i % 10 === 0) prog.textContent = `Bild ${i + 1} von ${frames} …`; };
+    if ($('dcBg').value === 'none') {
+      // Nach dem Ende der Animation ändert sich nichts mehr; diese Bilder nicht neu rendern
+      const files = [];
+      let bytes = null;
+      for (let i = 0; i < frames; i++) {
+        if (dc.cancel) { prog.textContent = 'Abgebrochen.'; return; }
+        const t = i / PC_FPS;
+        if (!bytes || t <= dc.animEnd + 0.05) {
+          dcDraw(canvas, d, undefined, t);
+          bytes = new Uint8Array(await (await toPng(canvas)).arrayBuffer());
+        } else if (i % 25 === 0) await new Promise(r => setTimeout(r));
+        files.push({name: `${stem}/${stem}_${String(i).padStart(5, '0')}.png`, bytes});
+        step(i);
+      }
+      prog.textContent = 'ZIP wird erstellt …';
+      await new Promise(r => setTimeout(r));
+      const zip = makeZip(files);
+      download(zip, stem + '_sequenz.zip');
+      prog.textContent = `${frames} Bilder gespeichert (${nf1.format(zip.size / 1048576)} MB).`;
+    } else {
+      const blob = await encodeMp4(canvas, {fps: PC_FPS, frames, draw: (cv, i) => dcDraw(cv, d, undefined, i / PC_FPS), progress: step, cancelled: () => dc.cancel});
+      if (!blob) { prog.textContent = 'Abgebrochen.'; return; }
+      download(blob, stem + '.mp4');
+      prog.textContent = `Video gespeichert (${nf1.format(blob.size / 1048576)} MB).`;
+    }
+  } catch (e) {
+    console.error(e);
+    prog.textContent = e.message || 'Export fehlgeschlagen.';
+  } finally {
+    dc.busy = false;
+    btn.textContent = label;
+    dcRefresh();
   }
 });
