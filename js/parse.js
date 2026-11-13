@@ -64,8 +64,8 @@ function parseFit(buf) {
         });
       } else {
         sessions++;
-        // Sportart der ersten Einheit: 1 = Laufen, 2 = Radfahren
-        if (sport == null && m[5] != null) sport = m[5] === 1 ? 'run' : m[5] === 2 ? 'ride' : '';
+        // Sportart der ersten Einheit: 1 = Laufen, 2 = Radfahren, 11/16/17 = Gehen/Bergsteigen/Wandern, 21 = E-Bike
+        if (sport == null && m[5] != null) sport = {1: 'run', 2: 'ride', 11: 'hike', 16: 'hike', 17: 'hike', 21: 'ride'}[m[5]] || '';
         if (m[22] != null) device.ascent = (device.ascent || 0) + m[22];
         if (m[23] != null) device.descent = (device.descent || 0) + m[23];
         if (m[9] != null) device.distance = (device.distance || 0) + m[9] / 100;
@@ -109,6 +109,17 @@ function parseFit(buf) {
   return {points, device: sessions ? device : null, sport: sport || null};
 }
 
+// Sportart aus Wörtern des Dateinamens, falls die Datei selbst keine angibt (z. B. „Geplante Wanderung.gpx“).
+// Ganze Wörter bzw. Wortanfänge, damit „Rundtour“ nicht als Lauf und „Paradies“ nicht als Rad gilt.
+function sportFromName(name) {
+  const words = name.toLowerCase().replace(/\.[^.]+$/, '').split(/[^a-zäöüß]+/).filter(Boolean);
+  const has = (exact, starts) => words.some(w => exact.includes(w) || starts.some(p => w.startsWith(p)));
+  if (has(['hike', 'hiking'], ['wander', 'trekking', 'bergtour'])) return 'hike';
+  if (has(['run', 'running', 'jogging'], ['lauf', 'läuf', 'marathon', 'halbmarathon', 'trailrun'])) return 'run';
+  if (has(['rad', 'ride', 'mtb', 'gravel'], ['radtour', 'radel', 'rennrad', 'bike', 'biking', 'cycl', 'fahrrad'])) return 'ride';
+  return null;
+}
+
 // ---------- GPX ----------
 function parseGpx(text) {
   const doc = new DOMParser().parseFromString(text, 'application/xml');
@@ -135,7 +146,7 @@ function parseGpx(text) {
   // <type> des Tracks, z. B. „running“ (Garmin) oder „9“ (Strava)
   const trk = doc.getElementsByTagNameNS('*', 'trk')[0];
   const type = trk ? ([...trk.children].find(el => el.localName === 'type') || {}).textContent || '' : '';
-  const sport = /run|^9$/i.test(type.trim()) ? 'run' : /cycl|bik|ride|^1$/i.test(type.trim()) ? 'ride' : null;
+  const sport = /run|^9$/i.test(type.trim()) ? 'run' : /hik|walk|wander|trek/i.test(type.trim()) ? 'hike' : /cycl|bik|ride|^1$/i.test(type.trim()) ? 'ride' : null;
   return {points, device: null, sport};
 }
 

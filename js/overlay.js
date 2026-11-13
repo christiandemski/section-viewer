@@ -7,7 +7,7 @@ const OV_FIELDS = [
   {id: 'place', label: 'Ort', unit: '', val: (r, c) => c.place},
   {id: 'dist', label: 'Distanz', unit: 'km', on: true, val: (r, c) => fmtKm(c.scope === 'stage' ? r.sDist : r.dist, c.dec)},
   {id: 'asc', label: 'Aufstieg', unit: 'hm', on: true, val: (r, c) => nf0.format(c.scope === 'stage' ? r.sAsc : r.asc)},
-  {id: 'moving', label: 'Fahrzeit', unit: 'Std.', val: (r, c) => fmtDur(ovMoving(r, c)), run: {label: 'Laufzeit'}},
+  {id: 'moving', label: 'Fahrzeit', unit: 'Std.', val: (r, c) => fmtDur(ovMoving(r, c)), run: {label: 'Laufzeit'}, hike: {label: 'Gehzeit'}},
   {id: 'elapsed', label: 'Gesamtzeit', unit: 'Std.', val: (r, c) => fmtDur(r.elapsed + (c.scope === 'stage' ? 0 : elapsedBefore(r.stage - 1)))},
   {id: 'clock', label: 'Uhrzeit', unit: 'Uhr', val: (r, c) => (c.clockSec ? fmtClock : fmtClockShort)(r.clock)},
   // wide: breitester zu erwartender Wert, damit die Spalten der Leiste nicht springen
@@ -16,6 +16,8 @@ const OV_FIELDS = [
   // Schnitt über die Fahrzeit; in den ersten Sekunden wäre der Wert noch reines Rauschen
   {id: 'avg', label: 'Ø Tempo', unit: 'km/h', wide: '00,0', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : nf1.format((c.scope === 'stage' ? r.sDist : r.dist) / m * 3.6); },
     run: {label: 'Ø Pace', unit: '/km', wide: '00:00', val: (r, c) => { const m = ovMoving(r, c); return m < 5 ? '–' : fmtPace((c.scope === 'stage' ? r.sDist : r.dist) / m); }}},
+  // Höhenmeter pro Stunde Bewegungszeit; vor der ersten Minute noch nicht aussagekräftig
+  {id: 'vam', label: 'Ø Aufstieg', unit: 'hm/h', wide: '0000', val: (r, c) => { const m = ovMoving(r, c); return m < 60 ? '–' : nf0.format((c.scope === 'stage' ? r.sAsc : r.asc) / m * 3600); }},
   {id: 'hr', label: 'Puls', unit: 'bpm', wide: '000', val: r => r.hr == null ? '–' : nf0.format(r.hr)},
   {id: 'grade', label: 'Steigung', unit: '%', wide: '-00', val: r => nf0.format(Math.round(r.grade) || 0)},
   {id: 'ele', label: 'Höhe', unit: 'm', wide: '0000', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
@@ -58,13 +60,15 @@ function ovApply(saved, ids) {
 }
 
 // Rad und Lauf haben je eine eigene Gestaltung; die Angaben zum Clip gelten für beide
-const ovStore = () => 'sectionviewer.overlay' + (isRun() ? '.run' : '');
+const ovStore = () => sportKey('sectionviewer.overlay');
 // Ausgangswerte: was im HTML vorbelegt ist, Werte in der Reihenfolge von OV_FIELDS; beim Laufen
 // Pace und Laufzeit statt Aufstieg in schmaler Schrift
 const OV_DEFAULTS = defaultsOf(OV_DESIGN);
 const OV_RUN_DEFAULTS = {ovFont: 'Barlow Condensed', ovWeight: '700', ovUpper: true, ovf_asc: false, ovf_speed: true, ovf_moving: true,
   order: ['place', 'dist', 'speed', 'moving', 'avg', 'asc', 'elapsed', 'clock', 'hr', 'grade', 'ele', 'temp']};
-const ovDefaults = () => ({...OV_DEFAULTS, order: OV_FIELDS.map(f => f.id), ...(isRun() ? OV_RUN_DEFAULTS : {})});
+// Wandern: Waldfarben, farbige Karte, Höhe dazu
+const OV_HIKE_DEFAULTS = {ovFont: 'Barlow', ovWeight: '700', ovAccent: '#7fb24a', ovText: '#f4f1e8', ovBase: '#e3ebd8', ovBgCol: '#13231a', ovTileStyle: 'color', ovf_ele: true};
+const ovDefaults = () => ({...OV_DEFAULTS, order: OV_FIELDS.map(f => f.id), ...({run: OV_RUN_DEFAULTS, hike: OV_HIKE_DEFAULTS}[state.sport] || {})});
 function ovLoadStored(ids) {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(ovStore())); } catch {}
@@ -541,7 +545,7 @@ function ovRefresh() {
   // Werte, die die Datei nicht enthält, lassen sich nicht einblenden
   const T = state.track;
   if (T) {
-    const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), temp: T.temp.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
+    const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, vam: !!T.t && T.hasEle, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), temp: T.temp.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
     for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
     $('ovProfile').disabled = !T.hasEle;
     $('ovMap').disabled = $('ovTiles').disabled = $('ovAttr').disabled = !T.hasGps;

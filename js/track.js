@@ -26,20 +26,14 @@ function buildTrack(raw) {
     for (let i = 0; i < n; i++) { if (pts[i].ele != null) last = pts[i].ele; ele[i] = last; }
   }
 
-  let t = null, moving = null;
+  let t = null, gap = 0;
   if (pts.every(p => p.t != null)) {
     t = Float64Array.from(pts, p => p.t);
     for (let i = 1; i < n; i++) if (t[i] < t[i - 1]) t[i] = t[i - 1];
-    // Pausen: Lücken in der Aufzeichnung oder Stillstand zählen nicht zur Fahrzeit
+    // Lücken in der Aufzeichnung: deutlich länger als der übliche Abstand zweier Punkte
     const dts = [];
     for (let i = 1; i < n; i++) dts.push(t[i] - t[i - 1]);
-    const gap = Math.max(10000, dts.slice().sort((a, b) => a - b)[dts.length >> 1] * 5);
-    moving = new Float64Array(n);
-    for (let i = 1; i < n; i++) {
-      const dt = t[i] - t[i - 1];
-      const isMoving = dt > 0 && dt <= gap && (dist[i] - dist[i - 1]) / (dt / 1000) >= 0.5;
-      moving[i] = moving[i - 1] + (isMoving ? dt / 1000 : 0);
-    }
+    gap = Math.max(10000, dts.slice().sort((a, b) => a - b)[dts.length >> 1] * 5);
   }
 
   const col = k => pts.map(p => p[k]);
@@ -50,7 +44,20 @@ function buildTrack(raw) {
       if (t[b] > t[a]) speed[i] = (dist[b] - dist[a]) / ((t[b] - t[a]) / 1000);
     }
   }
-  return {n, dist, ele, hasEle, t, moving, speed, lat: col('lat'), lon: col('lon'), hr: col('hr'), cad: col('cad'), power: col('power'), temp: col('temp')};
+  return {n, dist, ele, hasEle, t, gap, moving: null, speed, lat: col('lat'), lon: col('lon'), hr: col('hr'), cad: col('cad'), power: col('power'), temp: col('temp')};
+}
+
+// Bewegungszeit: Lücken in der Aufzeichnung und Stillstand (langsamer als minSpeed in m/s) zählen nicht.
+// Beim Wandern ist man an steilen Stellen langsam; erst unter 0,2 m/s (0,7 km/h) gilt es dort als Pause.
+const minSpeed = () => state.sport === 'hike' ? 0.2 : 0.5;
+function computeMoving(A, min) {
+  const {n, t, dist, gap} = A, moving = new Float64Array(n);
+  for (let i = 1; i < n; i++) {
+    const dt = t[i] - t[i - 1];
+    const isMoving = dt > 0 && dt <= gap && (dist[i] - dist[i - 1]) / (dt / 1000) >= min;
+    moving[i] = moving[i - 1] + (isMoving ? dt / 1000 : 0);
+  }
+  return moving;
 }
 
 // Kumulierter Auf-/Abstieg mit Hysterese: gezählt wird erst, wenn sich die Höhe
@@ -90,13 +97,16 @@ function locate(arr, v) {
 
 // ---------- State ----------
 // stages: je Datei eine Etappe; track: alle Etappen aneinandergehängt
-// sport: 'ride' oder 'run'; das Skript im <head> hat die gemerkte Sportart schon an <html> gesetzt
+// sport: 'ride', 'run' oder 'hike'; das Skript im <head> hat die gemerkte Sportart schon an <html> gesetzt
 const state = {stages: [], manualOrder: false, track: null, thr: 2, auto: true, asc: null, desc: null, rows: [],
-  sport: document.documentElement.dataset.sport === 'run' ? 'run' : 'ride'};
+  sport: ['run', 'hike'].includes(document.documentElement.dataset.sport) ? document.documentElement.dataset.sport : 'ride'};
 const multi = () => state.stages.length > 1;
 const isRun = () => state.sport === 'run';
-// Spalten und Overlay-Werte mit Abweichungen fürs Laufen unter `run`
-const bySport = o => isRun() && o.run ? {...o, ...o.run} : o;
+const isHike = () => state.sport === 'hike';
+// Spalten und Werte mit Abweichungen je Sportart unter `run` bzw. `hike`
+const bySport = o => o[state.sport] ? {...o, ...o[state.sport]} : o;
+// Speicherschlüssel je Sportart; Rad ohne Zusatz, wie vor der Einführung der Sportarten
+const sportKey = base => base + (state.sport === 'ride' ? '' : '.' + state.sport);
 const hasDeviceAscent = s => !!(s.device && s.device.ascent != null && s.track.hasEle);
 
 function combine() {
@@ -112,6 +122,7 @@ function combine() {
   let o = 0, distOff = 0, movOff = 0;
   S.forEach((s, k) => {
     const A = s.track;
+    if (A.t && A.movingFor !== minSpeed()) { A.moving = computeMoving(A, minSpeed()); A.movingFor = minSpeed(); }
     s.start = o; s.distOff = distOff;
     for (let i = 0; i < A.n; i++) {
       T.dist[o + i] = distOff + A.dist[i] - A.dist[0];

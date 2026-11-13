@@ -12,11 +12,13 @@ function pcTime(s) {
 const PC_STATS = [
   {id: 'dist', label: 'Distanz', on: true, val: d => [isRun() && d.dist < 100000 ? fmtKm(d.dist, 2) : nf1.format(d.dist / 1000), 'km']},
   {id: 'asc', label: 'Höhenmeter', on: true, need: 'ele', val: d => [nf0.format(d.asc), 'hm']},
-  {id: 'moving', label: 'Fahrzeit', on: true, need: 'time', val: d => pcTime(d.moving), run: {label: 'Laufzeit'}},
+  {id: 'moving', label: 'Fahrzeit', on: true, need: 'time', val: d => pcTime(d.moving), run: {label: 'Laufzeit'}, hike: {label: 'Gehzeit'}},
   {id: 'avg', label: 'Ø Tempo', on: true, need: 'time', val: d => [nf1.format(d.dist / d.moving * 3.6), 'km/h'],
     run: {label: 'Ø Pace', val: d => [fmtPace(d.dist / d.moving), '/km']}},
   {id: 'elapsed', label: 'Gesamtzeit', need: 'time', val: d => pcTime(d.elapsed)},
   {id: 'hr', label: 'Ø Puls', need: 'hr', val: d => [nf0.format(d.hr), 'bpm']},
+  {id: 'vam', label: 'Ø Aufstieg', need: 'vam', val: d => [nf0.format(d.asc / d.moving * 3600), 'hm/h']},
+  {id: 'maxEle', label: 'Höchster Punkt', need: 'ele', val: d => [nf0.format(d.maxEle), 'm']},
 ];
 const PC_PARTS = [['route', 'Strecke', 'gps'], ['profile', 'Höhenprofil', 'ele'], ['date', 'Datum', 'time']];
 $('pcChecks').innerHTML = PC_PARTS.map(([id, label]) => `<label><input type="checkbox" id="pc_${id}" checked>${label}</label>`).join('') +
@@ -27,8 +29,9 @@ $('pcFont').innerHTML = $('ovFont').innerHTML;
 const PC_SAVED = ['pcFormat', 'pcLayout', 'pcBg', 'pcBgCol', 'pcDim', 'pcFont', 'pcAccent', 'pcText', 'pcItalic', 'pcUpper',
   ...PC_PARTS.map(p => 'pc_' + p[0]), ...PC_STATS.map(f => 'pcs_' + f.id)];
 const PC_DEFAULTS = defaultsOf(PC_SAVED);
-const PC_SPORT = {ride: {pcFont: 'Montserrat'}, run: {pcFont: 'Barlow Condensed', pcItalic: true, pcUpper: true, pcAccent: '#ff5a3c'}};
-const pcStore = () => 'sectionviewer.postcard' + (isRun() ? '.run' : '');
+const PC_SPORT = {ride: {pcFont: 'Montserrat'}, run: {pcFont: 'Barlow Condensed', pcItalic: true, pcUpper: true, pcAccent: '#ff5a3c'},
+  hike: {pcFont: 'Barlow', pcAccent: '#9ccc65', pcText: '#f4f1e8', pcBgCol: '#16261b', pcs_avg: false, pcs_maxEle: true}};
+const pcStore = () => sportKey('sectionviewer.postcard');
 const pcSettings = () => Object.fromEntries(PC_SAVED.map(id => [id, $(id).type === 'checkbox' ? $(id).checked : $(id).value]));
 function pcLoadStored() {
   let saved = null;
@@ -61,6 +64,7 @@ function pcData(sc = $('pcScope').value) {
   let hs = 0, hn = 0;
   for (let i = a; i <= b; i++) if (T.hr[i] != null) { hs += T.hr[i]; hn++; }
   if (hn) d.hr = hs / hn;
+  if (T.hasEle) { d.maxEle = -Infinity; for (let i = a; i <= b; i++) if (T.ele[i] > d.maxEle) d.maxEle = T.ele[i]; }
   const idx = [];
   for (let i = a; i <= b; i++) if (T.lat[i] != null && T.lon[i] != null) idx.push(i);
   const stride = Math.max(1, Math.floor(idx.length / 1500));
@@ -72,7 +76,7 @@ function pcData(sc = $('pcScope').value) {
       d.prof.push(T.ele[p.i] + p.f * (T.ele[j] - T.ele[p.i]));
     }
   }
-  d.has = {gps: d.route.length > 1, ele: T.hasEle, time: !!T.t && d.moving > 0, hr: hn > 0};
+  d.has = {gps: d.route.length > 1, ele: T.hasEle, time: !!T.t && d.moving > 0, hr: hn > 0, vam: T.hasEle && !!T.t && d.moving > 60};
   return d;
 }
 

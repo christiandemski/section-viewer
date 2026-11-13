@@ -116,3 +116,22 @@ td input[type=text]{width:160px;padding:2px 6px;font-size:13px}
 [data-sport=run] .sport{border-radius:3px;transform:skewX(-12deg)}
 [data-sport=run] .sport button{font:italic 700 16px var(--cond);text-transform:uppercase;letter-spacing:.06em;padding:5px 20px}
 [data-sport=run] .ovgh{font-family:var(--cond);font-size:13px;letter-spacing:.1em}
+
+/* ---------- Wandern: Waldfarben, weiche Formen, ruhige Schrift ---------- */
+[data-sport=hike]{
+  --bg:#f2f3ee; --line:#dde2d6; --accent:#3a7d32; --accent-soft:rgba(58,125,50,.13);
+}
+@media (prefers-color-scheme:dark){[data-sport=hike]{
+  --bg:#0e140f; --surface:#162019; --line:#27332a; --accent:#8cc46a; --accent-soft:rgba(140,196,106,.16);
+}}
+[data-sport=hike] h1{font:700 26px/1.1 Barlow,system-ui,sans-serif;display:flex;align-items:center;gap:10px}
+[data-sport=hike] h1::before{content:"";width:28px;height:24px;background:var(--accent);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 24'%3E%3Cpath d='M0 24 9 8l5 8 4-6 10 14z'/%3E%3C/svg%3E") center/contain no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 28 24'%3E%3Cpath d='M0 24 9 8l5 8 4-6 10 14z'/%3E%3C/svg%3E") center/contain no-repeat}
+[data-sport=hike] h2,[data-sport=hike] #ovDesign summary{font:600 18px Barlow,system-ui,sans-serif}
+[data-sport=hike] .card{border-radius:16px}
+[data-sport=hike] .tile .k{text-transform:uppercase;font-size:11.5px;letter-spacing:.08em;font-weight:600}
+[data-sport=hike] .tile .v{font-family:Barlow,system-ui,sans-serif;font-weight:700}
+[data-sport=hike] td.main{color:var(--accent)}
+[data-sport=hike] .sport{border-radius:999px}
+[data-sport=hike] button,[data-sport=hike] input,[data-sport=hike] select{border-radius:10px}

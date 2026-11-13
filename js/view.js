@@ -10,8 +10,14 @@ function renderSummary() {
   const S = state.stages;
   if (T.t) {
     const elapsed = S.reduce((a, s) => a + (s.track.t[s.track.n - 1] - s.track.t[0]) / 1000, 0);
-    tiles.push([isRun() ? 'Laufzeit' : 'Fahrzeit', fmtDur(T.moving[last]), ''], ['Gesamtzeit', fmtDur(elapsed), '']);
-    if (isRun() && T.moving[last] > 0) tiles.push(['Ø Pace', fmtPace(T.dist[last] / T.moving[last]), '/km']);
+    const mv = T.moving[last];
+    tiles.push([isRun() ? 'Laufzeit' : isHike() ? 'Gehzeit' : 'Fahrzeit', fmtDur(mv), ''], ['Gesamtzeit', fmtDur(elapsed), '']);
+    if (isRun() && mv > 0) tiles.push(['Ø Pace', fmtPace(T.dist[last] / mv), '/km']);
+    // Wandern: Tempo und Höhenmeter pro Stunde Gehzeit
+    if (isHike() && mv > 60) {
+      tiles.push(['Ø Tempo', nf1.format(T.dist[last] / mv * 3.6), 'km/h']);
+      if (T.hasEle) tiles.push(['Ø Aufstieg', nf0.format(state.asc[last] / mv * 3600), 'hm/h']);
+    }
   }
   if (multi()) tiles.unshift(['Etappen', S.length, '']);
   $('tiles').innerHTML = tiles.map(([k, v, u]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');
@@ -26,6 +32,8 @@ function renderSummary() {
   }).join('');
 }
 
+// Laufen und Wandern: Schritte statt Kurbelumdrehungen
+const STEPS = {head: 'Schritte/min', csv: 'Schritte/min', fmt: v => nf0.format(v * cadMul()), raw: v => (v * cadMul()).toFixed(0)};
 const COLS = [
   {key: 'stage', multi: true, head: 'Tag', csv: 'Tag', fmt: String, raw: String},
   {key: 'sDist', multi: true, head: 'Tages-km', csv: 'Tages-km', fmt: v => nf1.format(v / 1000) + ' km', raw: v => (v / 1000).toFixed(2)},
@@ -34,7 +42,7 @@ const COLS = [
   {key: 'asc', head: 'Aufstieg', csv: 'Aufstieg (hm)', fmt: v => nf0.format(v) + ' hm', raw: v => v.toFixed(0), main: true},
   {key: 'desc', head: 'Abstieg', csv: 'Abstieg (hm)', fmt: v => nf0.format(v) + ' hm', raw: v => v.toFixed(0)},
   {key: 'ele', head: 'Höhe', csv: 'Höhe (m)', fmt: v => nf0.format(v) + ' m', raw: v => v.toFixed(0)},
-  {key: 'moving', head: 'Fahrzeit', csv: 'Fahrzeit', fmt: fmtDur, raw: fmtDur, run: {head: 'Laufzeit', csv: 'Laufzeit'}},
+  {key: 'moving', head: 'Fahrzeit', csv: 'Fahrzeit', fmt: fmtDur, raw: fmtDur, run: {head: 'Laufzeit', csv: 'Laufzeit'}, hike: {head: 'Gehzeit', csv: 'Gehzeit'}},
   {key: 'elapsed', head: 'Zeit seit Start', csv: 'Zeit seit Start', fmt: fmtDur, raw: fmtDur},
   {key: 'clock', head: 'Uhrzeit', csv: 'Uhrzeit', fmt: fmtClock, raw: fmtClock},
   {key: 'speed', head: 'Tempo', csv: 'Tempo (km/h)', fmt: v => nf1.format(v * 3.6) + ' km/h', raw: v => (v * 3.6).toFixed(1),
@@ -42,8 +50,7 @@ const COLS = [
   {key: 'split', head: 'Split-Pace', csv: 'Split-Pace (min/km)', fmt: v => paceSec(v) == null ? '–' : fmtPace(v) + ' /km', raw: v => paceSec(v) == null ? '' : fmtPace(v)},
   {key: 'hr', head: 'Puls', csv: 'Puls (bpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0)},
   {key: 'power', head: 'Leistung', csv: 'Leistung (W)', fmt: v => nf0.format(v) + ' W', raw: v => v.toFixed(0)},
-  {key: 'cad', head: 'Kadenz', csv: 'Kadenz (rpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0),
-    run: {head: 'Schritte/min', csv: 'Schritte/min', fmt: v => nf0.format(v * cadMul()), raw: v => (v * cadMul()).toFixed(0)}},
+  {key: 'cad', head: 'Kadenz', csv: 'Kadenz (rpm)', fmt: v => nf0.format(v), raw: v => v.toFixed(0), run: STEPS, hike: STEPS},
   {key: 'temp', head: 'Temp.', csv: 'Temperatur (°C)', fmt: v => nf0.format(v) + ' °C', raw: v => v.toFixed(0)},
 ];
 const cadMul = () => state.track.cadMed != null && state.track.cadMed < 120 ? 2 : 1;

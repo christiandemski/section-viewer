@@ -7,6 +7,8 @@ const SPORT = {
     sub: 'Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten', custom: 'z. B.  12,5  123  157  1:30:00  @14:35'},
   run: {intervals: [1, 2, 5, 10], interval: '1', store: 'sectionviewer.interval.run',
     sub: 'Kilometer, Pace und Höhenmeter bis zu einem bestimmten Punkt des Laufs betrachten', custom: 'z. B.  5  10  21,1  1:30:00  @9:45'},
+  hike: {intervals: [1, 2, 5, 10, 20], interval: '2', store: 'sectionviewer.interval.hike',
+    sub: 'Kilometer, Höhenmeter und Gehzeit bis zu einem bestimmten Punkt der Wanderung betrachten', custom: 'z. B.  4,5  12  2:30:00  @13:15'},
 };
 function setSport(sport) {
   const S = SPORT[sport];
@@ -23,6 +25,8 @@ function setSport(sport) {
   sel.innerHTML = '<option value="0">keine</option>' + S.intervals.map(k => `<option value="${k}">alle ${k} km</option>`).join('');
   sel.value = [...sel.options].some(o => o.value === v) ? v : S.interval;
   $('raceWrap').hidden = sport !== 'run';
+  // Die Bewegungszeit hängt von der Sportart ab (Pausenschwelle beim Wandern)
+  if (changed && state.stages.length) combine();
   ovSportChanged(changed);
   pcSportChanged(changed);
   dcSportChanged(changed);
@@ -97,7 +101,7 @@ function addStage(name, buf) {
   const parsed = isFit ? parseFit(buf) : parseGpx(new TextDecoder().decode(buf));
   const track = buildTrack(parsed.points);
   if (!state.stages.length) { state.thr = isFit ? 2 : 3; state.auto = true; }
-  state.stages.push({key, name, track, device: parsed.device, sport: parsed.sport, buf});
+  state.stages.push({key, name, track, device: parsed.device, sport: parsed.sport || sportFromName(name), buf});
 }
 const readError = (name, e) => { console.error(e); return name + ': ' + (e.message || 'Die Datei konnte nicht gelesen werden.'); };
 

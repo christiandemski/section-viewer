@@ -15,8 +15,9 @@ const DC_SAVED = ['dcLayout', 'dcRes', 'dcBg', 'dcBgCol', 'dcDim', 'dcFont', 'dc
   ...DC_PARTS.map(p => 'dc_' + p[0]), ...PC_STATS.map(f => 'dcs_' + f.id)];
 const DC_TEXTS = ['dcTitle', 'dcSub', 'dcFrom', 'dcTo'];
 const DC_DEFAULTS = defaultsOf(DC_SAVED);
-const DC_SPORT = {ride: {dcFont: 'Open Sans'}, run: {dcFont: 'Barlow Condensed', dcItalic: true, dcUpper: true, dcAccent: '#ff5a3c'}};
-const dcStore = () => 'sectionviewer.daycard' + (isRun() ? '.run' : '');
+const DC_SPORT = {ride: {dcFont: 'Open Sans'}, run: {dcFont: 'Barlow Condensed', dcItalic: true, dcUpper: true, dcAccent: '#ff5a3c'},
+  hike: {dcFont: 'Barlow', dcAccent: '#9ccc65', dcText: '#f4f1e8', dcBgCol: '#16261b'}};
+const dcStore = () => sportKey('sectionviewer.daycard');
 const dcSettings = () => Object.fromEntries(DC_SAVED.map(id => [id, $(id).type === 'checkbox' ? $(id).checked : $(id).value]));
 function dcLoadStored() {
   let saved = null;
