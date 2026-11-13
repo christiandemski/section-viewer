@@ -253,16 +253,29 @@
               <div class="wide"><label for="pcTitle">Titel</label><input id="pcTitle" type="text" placeholder="optional" autocomplete="off"></div>
             </div>
             <div class="chips" id="pcChecks"></div>
+            <div class="btnrow" style="margin-top:10px"><button id="pcPlaces" type="button" class="small" hidden title="Sendet die Koordinaten von Start und Ziel an OpenStreetMap (Nominatim); die Namen landen in der Tabelle">Start und Ziel abrufen</button><span class="hint" id="pcPlaceProg" role="status"></span></div>
+          </details>
+
+          <details class="group" open>
+            <summary>Animation</summary>
+            <div class="chips"><label class="chip"><input type="checkbox" id="pcAnim">Animiert – Werte erscheinen nacheinander</label></div>
+            <div class="grid" id="pcDurWrap">
+              <div><label for="pcDur">Dauer</label><select id="pcDur"><option value="6">6 s</option><option value="8" selected>8 s</option><option value="10">10 s</option><option value="15">15 s</option></select></div>
+            </div>
+            <div class="hint">Strecke und Profil zeichnen sich, die Zahlen zählen hoch; danach steht das fertige Bild bis zum Ende. Gespeichert wird ein MP4-Video (H.264, 30 Bilder/s), das Instagram direkt annimmt.</div>
           </details>
 
           <details class="group" open>
             <summary>Hintergrund</summary>
             <div class="grid">
-              <div><label for="pcBg">Hintergrund</label><select id="pcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color">Farbe</option></select></div>
-              <div><label for="pcBgCol">Farbe</label><input id="pcBgCol" type="color" value="#14181d"></div>
-              <div><label for="pcDim">Foto abdunkeln (%)</label><input id="pcDim" type="number" min="0" max="90" step="5" value="45"></div>
-              <div class="wide"><button id="pcPhotoBtn" type="button">Foto wählen …</button><input id="pcPhoto" type="file" accept="image/*" hidden></div>
+              <div><label for="pcBg">Hintergrund</label><select id="pcBg"><option value="none">transparent</option><option value="gradient">Verlauf</option><option value="map">Karte</option><option value="photo">Foto</option><option value="color">Farbe</option></select></div>
+              <div id="pcBgCol2Wrap"><label for="pcBgCol2">Verlauf oben</label><input id="pcBgCol2" type="color" value="#2a3039"></div>
+              <div id="pcBgColWrap"><label for="pcBgCol">Farbe</label><input id="pcBgCol" type="color" value="#14181d"></div>
+              <div id="pcTileWrap"><label for="pcTileStyle">Kartenstil</label><select id="pcTileStyle"><option value="dark">dunkel</option><option value="light">hell</option><option value="color">farbig</option></select></div>
+              <div id="pcDimWrap"><label for="pcDim">Abdunkeln (%)</label><input id="pcDim" type="number" min="0" max="90" step="5" value="45"></div>
+              <div class="wide" id="pcPhotoWrap"><button id="pcPhotoBtn" type="button">Foto wählen …</button><input id="pcPhoto" type="file" accept="image/*" hidden></div>
             </div>
+            <div class="hint" id="pcMapHint">Lädt Kartenkacheln von OpenStreetMap; der Kartenserver erfährt dabei den Ausschnitt. Die Quellenangabe „© OpenStreetMap“ steht klein im Bild.</div>
             <div class="hint">„Transparent“ ergibt einen Sticker, den du in der App über ein eigenes Foto oder Video legst. Ein Foto lässt sich auch einfach auf die Seite ziehen; es wird nur im Browser verarbeitet.</div>
           </details>
 
@@ -283,10 +296,18 @@
         <div class="stage-col">
           <div class="card preview-card">
             <div class="exports">
+              <button id="pcMp4" class="primary">Video speichern (MP4)</button>
               <button id="pcSave" class="primary">PNG speichern</button>
               <button id="pcShare" hidden>Teilen …</button>
             </div>
+            <div class="hint" id="pcProg" role="status"></div>
             <div class="pcpreview"><canvas id="pcCanvas" aria-label="Vorschau des Story-Bilds"></canvas></div>
+            <div class="player" id="pcPlayer">
+              <button id="pcPlay" class="icon" title="Animation abspielen" aria-label="Animation abspielen">▶</button>
+              <input id="pcSlider" type="range" min="0" max="8" step="any" value="8" aria-label="Zeitpunkt in der Animation">
+              <span id="pcTime"></span>
+            </div>
+            <div class="chips" id="pcSafeWrap"><label class="chip"><input type="checkbox" id="pcSafe">Bereiche zeigen, die Instagram verdeckt</label></div>
             <div class="hint" id="pcInfo" role="status"></div>
           </div>
         </div>
@@ -365,6 +386,8 @@
 <script src="js/view.js"></script>
 <script src="js/overlay.js"></script>
 <script src="js/overlay-export.js"></script>
+<script src="js/tiles.js"></script>
+<script src="js/mp4.js"></script>
 <script src="js/postcard.js"></script>
 <script src="js/daycard.js"></script>
 <script src="js/app.js"></script>
