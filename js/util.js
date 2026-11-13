@@ -47,3 +47,51 @@ function download(blob, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
 }
 
+
+// Elemente (sel) in box per Ziehen oder Alt + Pfeiltaste umordnen; done läuft danach
+function makeSortable(box, sel, done) {
+  let drag = null;
+  box.addEventListener('dragstart', ev => {
+    drag = ev.target.closest(sel);
+    if (!drag) return;
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.dataTransfer.setData('text/plain', drag.dataset.f || '');
+    setTimeout(() => drag && drag.classList.add('drag'));
+  });
+  box.addEventListener('dragover', ev => {
+    const over = ev.target.closest(sel);
+    if (!drag) return;
+    ev.preventDefault();
+    ev.stopPropagation(); // sonst hält die Seite das für eine abgelegte Datei
+    if (!over || over === drag) return;
+    const rect = over.getBoundingClientRect();
+    box.insertBefore(drag, ev.clientX < rect.left + rect.width / 2 ? over : over.nextSibling);
+  });
+  box.addEventListener('drop', ev => { if (drag) { ev.preventDefault(); ev.stopPropagation(); } });
+  box.addEventListener('dragend', () => {
+    if (!drag) return;
+    drag.classList.remove('drag');
+    drag = null;
+    done();
+  });
+  box.addEventListener('keydown', ev => {
+    const d = {ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1}[ev.key], item = ev.target.closest(sel);
+    if (!ev.altKey || !d || !item) return;
+    ev.preventDefault();
+    const sib = d < 0 ? item.previousElementSibling : item.nextElementSibling;
+    if (!sib || !sib.matches(sel)) return;
+    box.insertBefore(item, d < 0 ? sib : sib.nextSibling);
+    ev.target.focus();
+    const all = [...box.querySelectorAll(sel)];
+    announce(`${item.textContent.trim()}: Position ${all.indexOf(item) + 1} von ${all.length}`);
+    done();
+  });
+}
+
+// Kurze Ansage für Bildschirmleser
+function announce(text) {
+  const el = document.getElementById('live');
+  if (!el) return;
+  el.textContent = '';
+  setTimeout(() => { el.textContent = text; }, 30);
+}

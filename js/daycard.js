@@ -227,8 +227,9 @@ function dcRender() {
   dc.raf = 0;
   if (!state.track) return;
   const d = dcData($('dcScope').value);
-  for (const [id, , need] of DC_PARTS) $('dc_' + id).disabled = !!need && !d.has[need];
-  for (const f of PC_STATS) $('dcs_' + f.id).disabled = !!f.need && !d.has[f.need];
+  const why = (el, off) => { el.disabled = off; el.parentNode.title = off ? 'In dieser Datei nicht enthalten' : ''; };
+  for (const [id, , need] of DC_PARTS) why($('dc_' + id), !!need && !d.has[need]);
+  for (const f of PC_STATS) why($('dcs_' + f.id), !!f.need && !d.has[f.need]);
   // Vorschläge aus Tabelle und Abschnitt als Platzhalter
   $('dcTitle').placeholder = d.auto.title;
   $('dcFrom').placeholder = d.auto.from || 'Ort';

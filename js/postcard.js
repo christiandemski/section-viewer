@@ -238,8 +238,9 @@ function pcRender() {
   pc.raf = 0;
   if (!state.track) return;
   const d = pcData();
-  for (const [id, , need] of PC_PARTS) $('pc_' + id).disabled = !d.has[need];
-  for (const f of PC_STATS) $('pcs_' + f.id).disabled = !!f.need && !d.has[f.need];
+  const why = (el, off) => { el.disabled = off; el.parentNode.title = off ? 'In dieser Datei nicht enthalten' : ''; };
+  for (const [id, , need] of PC_PARTS) why($('pc_' + id), !d.has[need]);
+  for (const f of PC_STATS) why($('pcs_' + f.id), !!f.need && !d.has[f.need]);
   const cv = $('pcCanvas');
   pcDraw(cv, d);
   $('pcInfo').textContent = `${cv.width} × ${cv.height} px` + ($('pcBg').value === 'photo' && !pc.photo ? ' · noch kein Foto gewählt' : '');

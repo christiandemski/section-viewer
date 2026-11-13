@@ -20,6 +20,7 @@ function renderSummary() {
     }
   }
   if (multi()) tiles.unshift(['Etappen', S.length, '']);
+  $('filesSum').textContent = `${S.length} ${S.length === 1 ? 'Datei' : 'Dateien'} · Reihenfolge und Höhenmeter-Schwelle`;
   $('tiles').innerHTML = tiles.map(([k, v, u]) => `<div class="tile"><div class="k">${k}</div><div class="v">${v} <small>${u}</small></div></div>`).join('');
 
   $('stages').innerHTML = S.map((s, k) => {
@@ -146,13 +147,16 @@ function renderTable() {
   const cols = activeCols();
   const head = c => multi() && c.key === 'elapsed' ? 'Zeit seit Tagesstart' : multi() && (c.key === 'dist' || c.key === 'asc' || c.key === 'desc') ? c.head + ' ges.' : c.head;
   const gps = state.track.hasGps;
-  $('thead').innerHTML = '<tr><th>Punkt</th>' + (gps ? '<th class="l">Ort</th><th class="c" title="Ort klein in der Overlay-Karte zeigen">in Karte</th>' : '') + cols.map(c => `<th>${head(c)}</th>`).join('') + '<th></th></tr>';
-  $('tbody').innerHTML = state.rows.map((r, i) =>
-    `<tr data-i="${i}"><td>${esc(r.label)}</td>` +
-    (gps ? `<td class="l">${placeKey(r) ? `<input type="text" data-place="${placeKey(r)}" value="${esc(placeOf(r))}" autocomplete="off">` : ''}</td>` +
-      `<td class="c">${placeKey(r) ? `<input type="checkbox" data-mark="${placeKey(r)}"${marks[placeKey(r)] ? ' checked' : ''} title="Ort klein in der Overlay-Karte zeigen">` : ''}</td>` : '') +
-    cols.map(c => `<td${c.main ? ' class="main"' : ''}>${r[c.key] == null ? '–' : c.fmt(r[c.key])}</td>`).join('') +
-    `<td><button data-copy="${i}" title="${esc(overlayText(r))}">Kopieren</button> <button data-ov="${i}" title="Overlay ab diesem Punkt">Overlay</button></td></tr>`).join('');
+  $('thead').innerHTML = '<tr><th>Punkt</th>' + (gps ? '<th class="l">Ort</th><th class="c" title="Ort klein in der Karte des Video-Overlays zeigen">In Overlay-Karte</th>' : '') + cols.map(c => `<th>${head(c)}</th>`).join('') + '<th><span class="sr-only">Aktionen</span></th></tr>';
+  // data-l: Spaltenname für die Kartenansicht auf schmalen Bildschirmen
+  $('tbody').innerHTML = state.rows.map((r, i) => {
+    const l = esc(r.label);
+    return `<tr data-i="${i}"><td>${l}</td>` +
+      (gps ? `<td class="l" data-l="Ort">${placeKey(r) ? `<input type="text" data-place="${placeKey(r)}" value="${esc(placeOf(r))}" placeholder="Ort eintragen" aria-label="Ort bei ${l}" autocomplete="off">` : ''}</td>` +
+        `<td class="c" data-l="In Overlay-Karte">${placeKey(r) ? `<input type="checkbox" data-mark="${placeKey(r)}"${marks[placeKey(r)] ? ' checked' : ''} aria-label="Ort bei ${l} in der Overlay-Karte zeigen" title="Ort klein in der Karte des Video-Overlays zeigen">` : ''}</td>` : '') +
+      cols.map(c => `<td${c.main ? ' class="main"' : ''} data-l="${esc(head(c))}">${r[c.key] == null ? '–' : c.fmt(r[c.key])}</td>`).join('') +
+      `<td class="act"><button data-copy="${i}" title="Kopiert „${esc(overlayText(r))}“" aria-label="Werte bei ${l} kopieren">Kopieren</button> <button data-ov="${i}" title="Video-Overlay ab diesem Punkt" aria-label="Video-Overlay ab ${l}">Clip ab hier</button></td></tr>`;
+  }).join('');
 }
 
 function niceStep(range, count) {
@@ -185,8 +189,11 @@ function renderChart() {
          `<text x="${m.l - 6}" y="${y(e) + 4}" text-anchor="end">${nf0.format(e)} m</text>`;
   }
   const xs = niceStep(total / 1000, Math.max(3, Math.floor(pw / 90)));
-  for (let k = 0; k * 1000 <= total; k += xs) {
-    s += `<text x="${x(k * 1000)}" y="${H - 6}" text-anchor="middle">${nf0.format(k)}${k === 0 ? ' km' : ''}</text>`;
+  // bei kurzen Strecken Schritte unter 1 km, dann mit Nachkommastelle
+  const xf = xs < 1 ? nf1 : nf0;
+  for (let n = 0; n * xs * 1000 <= total + 1e-6; n++) {
+    const k = n * xs;
+    s += `<text x="${x(k * 1000)}" y="${H - 6}" text-anchor="middle">${k === 0 ? '0 km' : xf.format(k)}</text>`;
   }
   s += `<path d="${line}L${x(total).toFixed(1)} ${base}L${m.l} ${base}Z" fill="var(--accent-soft)"/>` +
        `<path d="${line}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>`;
@@ -196,6 +203,11 @@ function renderChart() {
     let label = '';
     if (px - lastLabel > 34) { label = `<text x="${px}" y="${m.t - 6}" text-anchor="middle">${nf0.format(r.dist / 1000)}</text>`; lastLabel = px; }
     s += `<g class="mk" data-i="${i}"><line x1="${px}" x2="${px}" y1="${m.t}" y2="${base}"/><circle cx="${px}" cy="${y(r.ele ?? lo)}" r="4"/>${label}</g>`;
+  });
+  // Etappengrenzen durchgezogen und beschriftet
+  state.stages.slice(1).forEach((st, k) => {
+    const px = x(st.distOff);
+    s += `<line class="stagebound" x1="${px}" x2="${px}" y1="${m.t}" y2="${base}"/><text class="stagelabel" x="${px + 5}" y="${m.t + 12}">Tag ${k + 2}</text>`;
   });
   s += `<g id="cross" style="display:none"><line y1="${m.t}" y2="${base}" stroke="var(--ink2)"/><circle r="4" fill="var(--accent)" stroke="var(--surface)" stroke-width="2"/></g>`;
   svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
@@ -219,7 +231,8 @@ $('chart').addEventListener('pointermove', ev => {
   tip.innerHTML = `<b>km ${nf1.format(r.dist / 1000)}</b> · ↑ ${nf0.format(r.asc)} hm<br>` +
     (multi() ? `Tag ${r.stage}: km ${nf1.format(r.sDist / 1000)} · ↑ ${nf0.format(r.sAsc)} hm<br>` : '') +
     `Höhe ${nf0.format(r.ele ?? 0)} m` +
-    (r.elapsed != null ? ` · ${fmtDur(r.elapsed)} · ${fmtClock(r.clock)}` : '');
+    (r.elapsed != null ? ` · ${fmtDur(r.elapsed)} · ${fmtClock(r.clock)}` : '') +
+    '<div class="tiphint">Klick setzt einen eigenen Punkt</div>';
   tip.style.display = 'block';
   const w = tip.offsetWidth, wrap = $('chartWrap').clientWidth;
   tip.style.left = (px + 12 + w > wrap ? px - 12 - w : px + 12) + 'px';
@@ -254,7 +267,7 @@ $('tbody').addEventListener('click', ev => {
     $('ovStart').value = r.stage + '/' + (r.elapsed != null ? fmtDur(Math.floor(r.elapsed)) : (r.sDist / 1000).toFixed(3));
     $('ovSlider').value = 0;
     ovRefresh();
-    $('ovCard').scrollIntoView({behavior: 'smooth'});
+    showTab('overlay');
     return;
   }
   copyText(overlayText(state.rows[+b.dataset.copy]));

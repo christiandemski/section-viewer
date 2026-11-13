@@ -23,8 +23,8 @@ const OV_FIELDS = [
   {id: 'ele', label: 'Höhe', unit: 'm', wide: '0000', val: r => r.ele == null ? '–' : nf0.format(r.ele)},
   {id: 'temp', label: 'Temperatur', unit: '°C', wide: '-00', val: r => r.temp == null ? '–' : nf0.format(r.temp)},
 ];
-$('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}>${bySport(f).label}</label>`).join('') +
-  '<label><input type="checkbox" id="ovMap" checked>Karte</label><label><input type="checkbox" id="ovTiles">Kartenhintergrund</label><label><input type="checkbox" id="ovAttr" checked>© in der Karte</label><label><input type="checkbox" id="ovProfile" checked>Höhenprofil</label><label><input type="checkbox" id="ovBox" checked>Hintergrund</label>';
+// Karte, Profil, Hintergrund und Kartenhintergrund stehen fest im HTML; hier nur die ziehbaren Werte
+$('ovChecks').innerHTML = OV_FIELDS.map(f => `<label class="ovf" draggable="true" data-f="${f.id}"><input type="checkbox" id="ovf_${f.id}"${f.on ? ' checked' : ''}><span>${bySport(f).label}</span></label>`).join('');
 // Nach einem Wechsel der Sportart: Beschriftung der Häkchen und, wenn gewünscht, deren Gestaltung
 function ovSportChanged(design) {
   for (const f of OV_FIELDS) $('ovf_' + f.id).nextSibling.textContent = bySport(f).label;
@@ -56,7 +56,7 @@ function ovApply(saved, ids) {
   if (!Array.isArray(saved.order)) return;
   // gemerkte Reihenfolge herstellen; neu hinzugekommene Werte stehen dahinter
   const labels = [...$('ovChecks').querySelectorAll('.ovf')], rank = id => { const n = saved.order.indexOf(id); return n < 0 ? 1e9 : n; };
-  labels.sort((a, b) => rank(a.dataset.f) - rank(b.dataset.f)).forEach(el => $('ovChecks').insertBefore(el, $('ovMap').parentNode));
+  labels.sort((a, b) => rank(a.dataset.f) - rank(b.dataset.f)).forEach(el => $('ovChecks').appendChild(el));
 }
 
 // Rad und Lauf haben je eine eigene Gestaltung; die Angaben zum Clip gelten für beide
@@ -92,6 +92,7 @@ async function ovLoadDesign(file) {
     ovApply(saved, OV_DESIGN);
     $('ovDesignName').value = typeof saved.name === 'string' ? saved.name : '';
     $('ovDesign').open = true;
+    if (state.track) showTab('overlay');
     msg.textContent = `„${file.name}“ geladen.`;
     ovRefresh();
   } catch {
@@ -107,34 +108,8 @@ $('ovDesignReset').addEventListener('click', () => {
 });
 $('ovDesignFile').addEventListener('change', ev => { if (ev.target.files[0]) ovLoadDesign(ev.target.files[0]); ev.target.value = ''; });
 
-// Reihenfolge der Werte durch Ziehen der Häkchen ändern
-{
-  const box = $('ovChecks');
-  let drag = null;
-  box.addEventListener('dragstart', ev => {
-    drag = ev.target.closest('.ovf');
-    if (!drag) return;
-    ev.dataTransfer.effectAllowed = 'move';
-    ev.dataTransfer.setData('text/plain', drag.dataset.f);
-    setTimeout(() => drag && drag.classList.add('drag'));
-  });
-  box.addEventListener('dragover', ev => {
-    const over = ev.target.closest('.ovf');
-    if (!drag) return;
-    ev.preventDefault();
-    ev.stopPropagation(); // sonst hält die Seite das für eine abgelegte Datei
-    if (!over || over === drag) return;
-    const rect = over.getBoundingClientRect();
-    box.insertBefore(drag, ev.clientX < rect.left + rect.width / 2 ? over : over.nextSibling);
-  });
-  box.addEventListener('drop', ev => { if (drag) { ev.preventDefault(); ev.stopPropagation(); } });
-  box.addEventListener('dragend', () => {
-    if (!drag) return;
-    drag.classList.remove('drag');
-    drag = null;
-    ovRefresh();
-  });
-}
+// Reihenfolge der Werte durch Ziehen der Häkchen oder Alt + Pfeiltaste ändern
+makeSortable($('ovChecks'), '.ovf', () => ovRefresh());
 
 const ov = {cfg: null, raf: 0, busy: false, cancel: false, fonts: new Set(), zipMax: 2e9};
 const ovMeasure = document.createElement('canvas').getContext('2d');
@@ -546,7 +521,11 @@ function ovRefresh() {
   const T = state.track;
   if (T) {
     const has = {place: T.hasGps, moving: !!T.t, elapsed: !!T.t, clock: !!T.t, avg: !!T.t, vam: !!T.t && T.hasEle, speed: T.speed.some(v => v != null), hr: T.hr.some(v => v != null), temp: T.temp.some(v => v != null), grade: T.hasEle, ele: T.hasEle, asc: T.hasEle};
-    for (const f of OV_FIELDS) $('ovf_' + f.id).disabled = has[f.id] === false;
+    for (const f of OV_FIELDS) {
+      const el = $('ovf_' + f.id);
+      el.disabled = has[f.id] === false;
+      el.parentNode.title = el.disabled ? 'In dieser Datei nicht enthalten' : '';
+    }
     $('ovProfile').disabled = !T.hasEle;
     $('ovMap').disabled = $('ovTiles').disabled = $('ovAttr').disabled = !T.hasGps;
   }
@@ -565,7 +544,11 @@ function ovRefresh() {
   if (!c.error) ovFonts(c).then(fresh => { if (fresh && ov.cfg === c) ovRefresh(); });
   if (!c.error) ovMapBg(c).then(fresh => { if (fresh && ov.cfg === c) ovRefresh(); });
   const slider = $('ovSlider');
-  if (c.error) $('ovInfo').textContent = c.error;
+  // Fehler direkt am Feld zeigen; Speichern geht erst wieder mit gültigem Start
+  $('ovStart').setAttribute('aria-invalid', !!c.error);
+  $('ovStartErr').textContent = c.error || '';
+  if (!ov.busy) $('ovZip').disabled = $('ovPng').disabled = !!c.error || !!c.empty;
+  if (c.error) $('ovInfo').textContent = '';
   else if (c.empty) $('ovInfo').textContent = 'Nichts ausgewählt.';
   else {
     slider.max = c.dur;
@@ -605,11 +588,12 @@ $('ovCard').addEventListener('input', ev => { if (ev.target.id === 'ovSlider') o
 
 $('ovPlay').addEventListener('click', () => {
   const btn = $('ovPlay'), slider = $('ovSlider'), c = ov.cfg;
-  const stop = () => { cancelAnimationFrame(ov.raf); ov.raf = 0; btn.textContent = '▶'; };
+  const stop = () => { cancelAnimationFrame(ov.raf); ov.raf = 0; btn.textContent = '▶'; btn.setAttribute('aria-label', 'Vorschau abspielen'); };
   if (ov.raf) { stop(); return; }
   if (!c || c.error || !c.dur) return;
   const from = +slider.value >= c.dur ? 0 : +slider.value, t0 = performance.now();
   btn.textContent = '❚❚';
+  btn.setAttribute('aria-label', 'Vorschau anhalten');
   const tick = () => {
     const cur = ov.cfg, tau = from + (performance.now() - t0) / 1000;
     if (!cur || cur.error || tau >= cur.dur) { if (cur && !cur.error) { slider.value = cur.dur; ovRender(); } stop(); return; }

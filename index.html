@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
+<meta name="color-scheme" content="light dark">
 <title>Section Viewer</title>
 <script>try{var s=localStorage.getItem('sectionviewer.sport');if(s==='run'||s==='hike')document.documentElement.dataset.sport=s}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,234 +12,352 @@
 <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
-<main>
-  <header class="top">
-    <h1>Section Viewer</h1>
+<header class="top">
+  <div class="topbar">
+    <h1 class="brand">Section Viewer</h1>
+    <div class="topactions" id="topActions" hidden>
+      <button id="addFiles" title="Weitere Etappen anhängen">+ Dateien</button>
+      <button id="sessionSave" title="Dateien, eigene Punkte, Einstellungen und Ortsnamen in einer .json-Datei speichern, um später oder auf einem anderen Gerät weiterzumachen. Enthält die vollständigen Aufzeichnungen mit allen GPS-Daten.">Session speichern</button>
+      <button id="reset" title="Alle Dateien entfernen und neu beginnen">Neu beginnen</button>
+    </div>
+  </div>
+  <div class="tabrow" id="tabRow" hidden>
+    <nav class="tabs" id="tabs" role="tablist" aria-label="Bereiche">
+      <button role="tab" id="tab-sections" data-tab="sections" aria-controls="panel-sections">Abschnitte</button>
+      <button role="tab" id="tab-overlay" data-tab="overlay" aria-controls="panel-overlay">Video-Overlay</button>
+      <button role="tab" id="tab-story" data-tab="story" aria-controls="panel-story">Story</button>
+      <button role="tab" id="tab-daycard" data-tab="daycard" aria-controls="panel-daycard">Tageskarte</button>
+    </nav>
     <div class="sport" id="sport" role="group" aria-label="Sportart">
       <button type="button" data-sport="ride" aria-pressed="true">Rad</button><button type="button" data-sport="run" aria-pressed="false">Lauf</button><button type="button" data-sport="hike" aria-pressed="false">Wandern</button>
     </div>
-  </header>
-  <p class="sub" id="sub">Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten</p>
-
-  <div id="drop" class="card">
-    <strong>FIT- oder GPX-Dateien hierher ziehen</strong> oder klicken zum Auswählen. Eine gespeicherte Session (.json) lässt sich genauso öffnen.<br>
-    <span class="hint">Mehrere Dateien werden als Etappen einer Tour aneinandergehängt. Alles wird nur lokal im Browser ausgewertet, nichts wird hochgeladen.</span>
-    <input id="file" type="file" accept=".fit,.gpx,.json" multiple hidden>
-    <div id="status"></div>
   </div>
+</header>
+
+<main>
+  <div id="status" class="status" role="status"></div>
+  <div id="live" class="sr-only" aria-live="polite"></div>
+
+  <!-- Startbildschirm: erst die Sportart, dann die Aufzeichnung -->
+  <section id="start">
+    <h2 class="hero">Tour auswerten</h2>
+    <p class="lead" id="sub">Kilometer und Höhenmeter bis zu einem bestimmten Punkt der Tour betrachten</p>
+    <div class="step"><span class="num">1</span>Was hast du gemacht?</div>
+    <div class="sportpick" id="sportPick" role="group" aria-label="Sportart">
+      <button type="button" data-sport="ride" aria-pressed="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5.5" cy="16.5" r="3.5"/><circle cx="18.5" cy="16.5" r="3.5"/><path d="M5.5 16.5L9 9h7l2.5 7.5M9 9l3.5 7.5h-7M14.5 6H17l-1 3"/></svg>Radfahren</button>
+      <button type="button" data-sport="run" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="14.5" cy="4" r="2"/><path d="M7 21l3.5-5.5L13 17l1 4M10.5 15.5L12 10l-3 1.5L7 14M12 10l2.5 3.5H18"/></svg>Laufen</button>
+      <button type="button" data-sport="hike" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 20l7-11 4 6 3-4 6 9z"/><path d="M9 9l1.5 2.3"/></svg>Wandern</button>
+    </div>
+    <div class="step"><span class="num">2</span>Aufzeichnung laden</div>
+    <div id="drop" class="drop" tabindex="0" role="button" aria-label="FIT- oder GPX-Dateien oder eine Session auswählen">
+      <svg class="dropicon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0-12l-4 4m4-4l4 4M4 15v4a2 2 0 002 2h12a2 2 0 002-2v-4"/></svg>
+      <strong><span class="fine">FIT- oder GPX-Dateien hierher ziehen</span><span class="coarse">FIT- oder GPX-Dateien auswählen</span></strong>
+      <span class="fine">oder klicken zum Auswählen</span>
+      <span class="hint">Mehrere Dateien werden als Etappen einer Tour aneinandergehängt. Eine gespeicherte Session (.json) lässt sich genauso öffnen. Alles wird nur lokal im Browser ausgewertet, nichts wird hochgeladen.</span>
+    </div>
+  </section>
+  <input id="file" type="file" accept=".fit,.gpx,.json" multiple hidden>
 
   <div id="app" hidden>
-    <div class="card">
+    <!-- Tour: über allen Reitern -->
+    <section class="card tour">
       <div class="tiles" id="tiles"></div>
-      <div id="stages"></div>
-    </div>
-
-    <div class="card controls">
-      <div>
-        <label for="interval">Standard-Abschnitte</label>
-        <select id="interval"></select>
-        <div id="raceWrap" class="inline race"><input id="race" type="checkbox" checked><label for="race" title="5 km, 10 km, Halbmarathon (21,1 km) und Marathon (42,2 km), soweit der Lauf so lang ist">Wettkampf-Marken</label></div>
-      </div>
-      <div>
-        <label for="custom">Eigene Punkte</label>
-        <input id="custom" type="text" placeholder="z. B.  12,5  123  157  1:30:00  @14:35" autocomplete="off">
-        <div class="hint">Mit Leerzeichen trennen. Zahl = Kilometer · <code>1:30:00</code> = Zeit seit Start · <code>@14:35</code> = Uhrzeit. Klick ins Höhenprofil fügt einen Punkt hinzu.</div>
-        <div class="hint" id="multiHint" hidden>Bei mehreren Etappen: Zahl = Gesamtkilometer · <code>3/45</code> = Tag 3, Tageskilometer 45 · Zeiten immer mit Tag, z. B. <code>3/1:30:00</code> oder <code>3/@14:35</code>.</div>
-        <div class="hint warn" id="customErr"></div>
-      </div>
-      <div>
-        <label for="thr">Höhenmeter-Schwelle (m)</label>
-        <div class="inline">
-          <input id="thr" type="number" min="0" max="20" step="0.1">
-          <span id="autoWrap" class="inline"><input id="auto" type="checkbox"><label for="auto">an Garmin-Wert anpassen</label></span>
+      <details class="files" id="files">
+        <summary id="filesSum">Dateien &amp; Höhenmeter</summary>
+        <div id="stages"></div>
+        <div class="tourset">
+          <label for="thr">Höhenmeter-Schwelle</label>
+          <input id="thr" type="number" min="0" max="20" step="0.1"><span class="unit">m</span>
+          <span id="autoWrap" class="chk"><input id="auto" type="checkbox"><label for="auto">an Garmin-Wert anpassen</label></span>
+          <button class="info" data-help="thrHelp" aria-expanded="false" title="Erklärung">?</button>
         </div>
-        <div class="hint">Anstiege zählen erst ab dieser Höhendifferenz (filtert Messrauschen).</div>
-      </div>
-    </div>
-
-    <div class="card">
-      <div id="chartWrap"><svg id="chart"></svg><div id="tip"></div></div>
-    </div>
-
-    <div class="card">
-      <div class="tablehead">
-        <h2>Werte bis zum jeweiligen Punkt</h2>
-        <div class="inline"><button id="reset">Alle Dateien entfernen</button><button id="sessionSave" title="Dateien, eigene Punkte, Einstellungen und Ortsnamen in einer .json-Datei speichern">Session speichern</button><button id="places">Orte abrufen</button><button id="copyAll">Tabelle kopieren</button><button id="csv">CSV speichern</button></div>
-      </div>
-      <div class="scroll"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
-      <div class="hint" id="placeHint">„Orte abrufen“ sendet die Koordinaten der Tabellenpunkte an OpenStreetMap (Nominatim) – nur dann verlässt etwas den Browser. Die Namen lassen sich in der Tabelle überschreiben und bleiben gespeichert. Ortsdaten © OpenStreetMap-Mitwirkende. <span id="placeProg" class="warn"></span></div>
-      <div class="hint">„Session speichern“ legt alles in einer .json-Datei ab, um später oder auf einem anderen Gerät weiterzumachen: die Datei einfach auf die Seite ziehen. Sie enthält die vollständigen Aufzeichnungen mit allen GPS-Daten.</div>
-    </div>
-
-    <div class="card" id="ovCard">
-      <div class="tablehead"><h2>Overlay für Premiere Pro</h2></div>
-      <div class="ovgrid">
-        <div class="wide">
-          <label for="ovStart">Start des Clips</label>
-          <input id="ovStart" type="text" placeholder="Tourstart" autocomplete="off">
-        </div>
-        <div><label for="ovDur">Dauer (s)</label><input id="ovDur" type="number" min="0" step="0.5" value="10"></div>
-        <div><label for="ovFps">Bilder/s</label><select id="ovFps"><option>24</option><option selected>25</option><option>30</option><option>50</option><option>60</option></select></div>
-        <div><label for="ovSpeed">Zeitraffer ×</label><input id="ovSpeed" type="number" min="0.1" step="0.1" value="1"></div>
-        <div><label for="ovSize">Größe</label><select id="ovSize"><option value="1">für 1080p</option><option value="2" selected>für 4K</option></select></div>
-        <div><label for="ovDec">Kilometer</label><select id="ovDec"><option value="2">12,34</option><option value="1">12,3</option></select></div>
-        <div><label for="ovClock">Uhrzeit</label><select id="ovClock"><option value="1">14:35:07</option><option value="0">14:35</option></select></div>
-        <div id="ovScopeWrap"><label for="ovScope">Bezug</label><select id="ovScope"><option value="tour">ganze Tour</option><option value="stage">nur dieser Tag</option></select></div>
-        <div class="wide"><label for="ovPlace">Ort am Startpunkt</label><input id="ovPlace" type="text" autocomplete="off"></div>
-      </div>
-      <details id="ovDesign">
-        <summary>Gestaltung</summary>
-        <div class="ovgh">Layout</div>
-        <div class="ovgrid">
-          <div><label for="ovLayout">Anordnung</label><select id="ovLayout"><option value="list">Liste</option><option value="bar">Leiste</option></select></div>
-          <div><label for="ovWidth">Breite (px bei 1080p)</label><input id="ovWidth" type="number" min="120" step="10" placeholder="auto"></div>
-          <div><label for="ovMapPos">Karte</label><select id="ovMapPos"><option value="top">über den Werten</option><option value="bottom">unter den Werten</option><option value="side">links daneben (so hoch wie die Werte)</option></select></div>
-        </div>
-        <div class="ovgh">Schrift</div>
-        <div class="ovgrid">
-          <div><label for="ovFont">Schriftart</label><select id="ovFont">
-            <option>Open Sans</option><option>Roboto</option><option>Inter</option><option>Montserrat</option><option>Barlow</option><option>Barlow Condensed</option><option>Oswald</option>
-          </select></div>
-          <div><label for="ovWeight">Schnitt</label><select id="ovWeight">
-            <option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option>
-            <option value="600">SemiBold</option><option value="700" selected>Bold</option><option value="800">ExtraBold</option>
-            <option value="c400">Condensed Regular</option><option value="c600">Condensed SemiBold</option><option value="c700">Condensed Bold</option>
-          </select></div>
-          <div><label for="ovScale">Textgröße (%)</label><input id="ovScale" type="number" min="50" max="300" step="5" value="100"></div>
-          <div class="chk"><label><input type="checkbox" id="ovLabels" checked>Beschriftungen</label></div>
-          <div class="chk"><label><input type="checkbox" id="ovUpper">Großbuchstaben</label></div>
-        </div>
-        <div class="ovgh">Farben &amp; Hintergrund</div>
-        <div class="ovgrid">
-          <div><label for="ovAccent">Akzent</label><input id="ovAccent" type="color" value="#ff6a1a"></div>
-          <div><label for="ovText">Text</label><input id="ovText" type="color" value="#ffffff"></div>
-          <div><label for="ovBase">Strecke</label><input id="ovBase" type="color" value="#ffffff"></div>
-          <div><label for="ovBgCol">Hintergrund</label><input id="ovBgCol" type="color" value="#0c1014"></div>
-          <div><label for="ovBgAlpha">Deckkraft (%)</label><input id="ovBgAlpha" type="number" min="0" max="100" step="5" value="55"></div>
-          <div><label for="ovRadius">Ecken (px)</label><input id="ovRadius" type="number" min="0" max="60" step="1" value="14"></div>
-          <div class="chk"><label><input type="checkbox" id="ovShadow" checked>Schatten</label></div>
-        </div>
-        <div class="ovgh">Karte</div>
-        <div class="ovgrid">
-          <div><label for="ovTileStyle">Kartenhintergrund</label><select id="ovTileStyle"><option value="dark">dunkel</option><option value="light">hell</option><option value="color">farbig</option></select></div>
-          <div><label for="ovTileAlpha">Deckkraft (%)</label><input id="ovTileAlpha" type="number" min="0" max="100" step="5" value="45"></div>
-          <div><label for="ovMapH">max. Höhe (px)</label><input id="ovMapH" type="number" min="60" max="1000" step="10" value="220"></div>
-          <div><label for="ovLine">Linie (px)</label><input id="ovLine" type="number" min="1" max="12" step="0.5" value="3"></div>
-        </div>
-        <div class="ovgh">Vorlage</div>
-        <div class="inline ovbar">
-          <input id="ovDesignName" type="text" placeholder="Name der Vorlage" autocomplete="off">
-          <button id="ovDesignSave">Gestaltung speichern</button>
-          <button id="ovDesignLoad">Gestaltung laden</button>
-          <button id="ovDesignReset" title="Gestaltung auf die Ausgangswerte zurücksetzen">Standard</button>
-          <input id="ovDesignFile" type="file" accept=".json,application/json" hidden>
-          <span class="hint" id="ovDesignMsg"></span>
-        </div>
-        <div class="hint">Speichert alle Einstellungen unter „Gestaltung“ sowie die gewählten Werte, ihre Reihenfolge, Karte, Höhenprofil, Hintergrund und die Zahlenformate als JSON-Datei. Start, Dauer, Bilder/s, Zeitraffer, Größe und Bezug gehören zum einzelnen Clip und bleiben unverändert. Eine Vorlage lässt sich auch einfach auf die Seite ziehen.</div>
+        <div class="hint" id="thrHelp" hidden>Anstiege zählen erst ab dieser Höhendifferenz, das filtert Messrauschen. Mit „an Garmin-Wert anpassen“ wird die Schwelle so gewählt, dass die Summe dem Wert der Uhr entspricht.</div>
       </details>
-      <div class="hint">Start wie bei „Eigene Punkte“ (ein Punkt) oder per Knopf „Overlay“ in der Tabelle. Zeitraffer 1 = Echtzeit; 4 = der Clip läuft im Video vierfach beschleunigt. Die Reihenfolge der Werte lässt sich durch Ziehen der Häkchen ändern.</div>
-      <div class="ovchecks" id="ovChecks"></div>
-      <div class="ovpreview"><canvas id="ovCanvas"></canvas></div>
-      <div class="inline ovbar">
-        <button id="ovPlay" title="Vorschau abspielen">▶</button>
-        <input id="ovSlider" type="range" min="0" max="10" step="any" value="0">
-        <span id="ovTime"></span>
-      </div>
-      <div class="hint" id="ovInfo"></div>
-      <div class="inline ovbar">
-        <button id="ovZip">PNG-Sequenz speichern (ZIP)</button>
-        <button id="ovPng">Einzelbild speichern (PNG)</button>
-        <button id="ovAll" title="Je eigenem Punkt eine Sequenz ab diesem Punkt, alle in einem ZIP">Alle eigenen Punkte speichern (ZIP)</button>
-        <span class="hint" id="ovProg"></span>
-      </div>
-      <div class="hint">„Alle eigenen Punkte“ erzeugt für jeden Eintrag aus „Eigene Punkte“ eine Sequenz mit den Einstellungen oben, jede in einem eigenen Ordner.</div>
-      <div class="hint">„Kartenhintergrund“ lädt Kartenkacheln von OpenStreetMap; der Kartenserver erfährt dabei den Kartenausschnitt. Die Quellenangabe „© OpenStreetMap“ ist Pflicht: entweder klein in der Karte („© in der Karte“) oder an anderer Stelle im Video, z. B. im Abspann oder in der Beschreibung.</div>
-      <div class="hint">In Premiere: ZIP entpacken, „Datei › Importieren“, das erste Bild auswählen und „Bildsequenz“ anhaken. Der Hintergrund ist transparent. Stimmt die Länge nicht, die Framerate über „Ändern › Filmmaterial interpretieren“ auf den Wert oben setzen.</div>
-    </div>
+    </section>
 
-    <div class="card" id="pcCard">
-      <div class="tablehead"><h2>Story-Creator</h2><span class="hint">Bild für Beiträge und Stories</span></div>
-      <div class="pcwrap">
-        <div>
-          <div class="ovgrid">
-            <div><label for="pcFormat">Format</label><select id="pcFormat"><option value="story">Story 9:16</option><option value="post" selected>Beitrag 4:5</option><option value="square">Quadrat 1:1</option></select></div>
-            <div><label for="pcLayout">Anordnung</label><select id="pcLayout"><option value="big">Strecke groß</option><option value="bottom">alles unten</option></select></div>
-            <div id="pcScopeWrap"><label for="pcScope">Abschnitt</label><select id="pcScope"></select></div>
-            <div class="wide"><label for="pcTitle">Titel</label><input id="pcTitle" type="text" placeholder="optional" autocomplete="off"></div>
+    <!-- Abschnitte -->
+    <section id="panel-sections" class="panel" role="tabpanel" aria-labelledby="tab-sections">
+      <div class="card">
+        <div class="controls">
+          <div>
+            <label for="interval">Standard-Abschnitte</label>
+            <select id="interval"></select>
+            <div id="raceWrap" class="chk race"><input id="race" type="checkbox" checked><label for="race" title="5 km, 10 km, Halbmarathon (21,1 km) und Marathon (42,2 km), soweit der Lauf so lang ist">Wettkampf-Marken</label></div>
           </div>
-          <div class="ovgh">Inhalt</div>
-          <div class="ovchecks" id="pcChecks"></div>
-          <div class="ovgh">Hintergrund</div>
-          <div class="ovgrid">
-            <div><label for="pcBg">Hintergrund</label><select id="pcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color">Farbe</option></select></div>
-            <div><label for="pcBgCol">Farbe</label><input id="pcBgCol" type="color" value="#14181d"></div>
-            <div><label for="pcDim">Foto abdunkeln (%)</label><input id="pcDim" type="number" min="0" max="90" step="5" value="45"></div>
-            <div class="chk"><button id="pcPhotoBtn" type="button">Foto wählen</button><input id="pcPhoto" type="file" accept="image/*" hidden></div>
+          <div>
+            <div class="labelrow"><label for="custom">Eigene Punkte</label><button class="info" data-help="customHelp" aria-expanded="false" title="Schreibweisen">?</button></div>
+            <input id="custom" type="text" placeholder="z. B.  12,5  123  157  1:30:00  @14:35" autocomplete="off" aria-describedby="customErr">
+            <div class="hint">Mit Leerzeichen trennen – oder ins Höhenprofil klicken.</div>
+            <div class="hint" id="customHelp" hidden>Zahl = Kilometer · <code>1:30:00</code> = Zeit seit Start · <code>@14:35</code> = Uhrzeit.</div>
+            <div class="hint" id="multiHint" hidden>Bei mehreren Etappen: Zahl = Gesamtkilometer · <code>3/45</code> = Tag 3, Tageskilometer 45 · Zeiten immer mit Tag, z. B. <code>3/1:30:00</code> oder <code>3/@14:35</code>.</div>
+            <div class="hint warn" id="customErr" role="status"></div>
           </div>
-          <div class="ovgh">Schrift &amp; Farben</div>
-          <div class="ovgrid">
-            <div><label for="pcFont">Schriftart</label><select id="pcFont"></select></div>
-            <div><label for="pcAccent">Akzent</label><input id="pcAccent" type="color" value="#ff6a1a"></div>
-            <div><label for="pcText">Text</label><input id="pcText" type="color" value="#ffffff"></div>
-            <div class="chk"><label><input type="checkbox" id="pcItalic">Kursiv</label></div>
-            <div class="chk"><label><input type="checkbox" id="pcUpper">Großbuchstaben</label></div>
-          </div>
-          <div class="inline ovbar">
-            <button id="pcSave">PNG speichern</button>
-            <button id="pcShare" hidden>Teilen …</button>
-            <span class="hint" id="pcInfo"></span>
-          </div>
-          <div class="hint">„Transparent“ ergibt einen Sticker, den du in der App über ein eigenes Foto oder Video legst. Ein Foto lässt sich auch einfach auf die Seite ziehen; es wird nur im Browser verarbeitet. Bei Stories bleibt oben und unten Platz für die Bedienelemente der App.</div>
         </div>
-        <div class="pcpreview"><canvas id="pcCanvas"></canvas></div>
+        <div id="chartWrap"><svg id="chart" role="img" aria-label="Höhenprofil der Tour mit den Tabellenpunkten"></svg><div id="tip"></div></div>
       </div>
-    </div>
 
-    <div class="card" id="dcCard">
-      <div class="tablehead"><h2>Tageskarte</h2><span class="hint">Zwischenkarte für Videos, 16:9</span></div>
-      <div class="pcwrap dcwrap">
-        <div>
-          <div class="ovgrid">
-            <div class="wide"><label for="dcLayout">Anordnung</label><select id="dcLayout"><option value="split" selected>Zahlen links, Strecke rechts</option><option value="center">Titel mittig, Zahlen unten</option><option value="map">Strecke groß, Leiste unten</option></select></div>
-            <div><label for="dcRes">Auflösung</label><select id="dcRes"><option value="4k" selected>3840 × 2160</option><option value="hd">1920 × 1080</option></select></div>
-            <div id="dcScopeWrap"><label for="dcScope">Abschnitt</label><select id="dcScope"></select></div>
-            <div class="wide"><label for="dcTitle">Titel</label><input id="dcTitle" type="text" placeholder="optional" autocomplete="off"></div>
-            <div class="wide"><label for="dcSub">Untertitel</label><input id="dcSub" type="text" placeholder="z. B. Via Claudia Augusta" autocomplete="off"></div>
-            <div class="wide"><label for="dcFrom">Start</label><input id="dcFrom" type="text" autocomplete="off"></div>
-            <div class="wide"><label for="dcTo">Ziel</label><input id="dcTo" type="text" autocomplete="off"></div>
-          </div>
-          <div class="inline ovbar"><button id="dcPlaces" type="button" hidden>Start und Ziel abrufen</button><span class="hint" id="dcPlaceProg"></span></div>
-          <div class="hint">Start und Ziel kommen aus der Tabelle. „Start und Ziel abrufen“ sendet nur die Koordinaten von Start und Ziel jeder Etappe an OpenStreetMap (Nominatim); die Namen landen in der Tabelle und lassen sich dort korrigieren. Die Felder oben überschreiben sie nur für diese Karte.</div>
-          <div class="ovgh">Inhalt</div>
-          <div class="ovchecks" id="dcChecks"></div>
-          <div class="hint">Höchstens vier Kennzahlen; sind mehr angehakt, erscheinen die ersten vier.</div>
-          <div class="ovgh">Hintergrund</div>
-          <div class="ovgrid">
-            <div><label for="dcBg">Hintergrund</label><select id="dcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color" selected>Farbe</option></select></div>
-            <div><label for="dcBgCol">Farbe</label><input id="dcBgCol" type="color" value="#14181d"></div>
-            <div><label for="dcDim">Foto abdunkeln (%)</label><input id="dcDim" type="number" min="0" max="90" step="5" value="45"></div>
-            <div class="chk"><button id="dcPhotoBtn" type="button">Foto wählen</button><input id="dcPhoto" type="file" accept="image/*" hidden></div>
-          </div>
-          <div class="ovgh">Schrift &amp; Farben</div>
-          <div class="ovgrid">
-            <div><label for="dcFont">Schriftart</label><select id="dcFont"></select></div>
-            <div><label for="dcAccent">Akzent</label><input id="dcAccent" type="color" value="#ff6a1a"></div>
-            <div><label for="dcText">Text</label><input id="dcText" type="color" value="#ffffff"></div>
-            <div class="chk"><label><input type="checkbox" id="dcItalic">Kursiv</label></div>
-            <div class="chk"><label><input type="checkbox" id="dcUpper">Großbuchstaben</label></div>
-          </div>
-          <div class="inline ovbar">
-            <button id="dcSave">PNG speichern</button>
-            <button id="dcZip" hidden>Alle Tage als ZIP</button>
-            <span class="hint" id="dcInfo"></span>
-          </div>
-          <div class="hint">„Transparent“ ergibt eine Ebene, die du in Premiere über das Video legst. „Alle Tage als ZIP“ speichert eine Karte je Etappe; Titel, Start und Ziel aus den Feldern oben gelten dabei nur für den gewählten Tag. Ein auf die Seite gezogenes Foto geht an den Story-Creator, für die Tageskarte „Foto wählen“ nutzen; es wird nur im Browser verarbeitet.</div>
+      <div class="card">
+        <div class="cardhead">
+          <h2>Werte bis zum jeweiligen Punkt</h2>
+          <div class="btnrow"><button id="places">Orte abrufen</button><button id="copyAll">Tabelle kopieren</button><button id="csv">CSV speichern</button></div>
         </div>
-        <div class="pcpreview"><canvas id="dcCanvas"></canvas></div>
+        <div class="scroll"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+        <div class="hint" id="placeHint">„Orte abrufen“ sendet die Koordinaten der Tabellenpunkte an OpenStreetMap (Nominatim) – nur dann verlässt etwas den Browser. Namen lassen sich in der Tabelle überschreiben und bleiben gespeichert. Ortsdaten © OpenStreetMap-Mitwirkende. <span id="placeProg" class="warn" role="status"></span></div>
       </div>
-    </div>
+    </section>
+
+    <!-- Video-Overlay -->
+    <section id="panel-overlay" class="panel" role="tabpanel" aria-labelledby="tab-overlay" hidden>
+      <div class="studio" id="ovCard">
+        <div class="settings">
+          <details class="group" open>
+            <summary>Clip</summary>
+            <div class="grid">
+              <div class="wide">
+                <div class="labelrow"><label for="ovStart">Start des Clips</label><button class="info" data-help="ovStartHelp" aria-expanded="false" title="Erklärung">?</button></div>
+                <input id="ovStart" type="text" placeholder="Tourstart" autocomplete="off" aria-describedby="ovStartErr">
+                <div class="hint warn" id="ovStartErr" role="status"></div>
+                <div class="hint" id="ovStartHelp" hidden>Schreibweise wie bei „Eigene Punkte“ (ein Punkt) – oder in der Tabelle bei einem Punkt auf „Clip ab hier“ klicken.</div>
+              </div>
+              <div><label for="ovDur">Dauer (s)</label><input id="ovDur" type="number" min="0" step="0.5" value="10"></div>
+              <div><label for="ovSpeed">Zeitraffer ×</label><input id="ovSpeed" type="number" min="0.1" step="0.1" value="1" title="1 = Echtzeit; 4 = der Clip läuft im Video vierfach beschleunigt"></div>
+              <div><label for="ovFps">Bilder/s</label><select id="ovFps"><option>24</option><option selected>25</option><option>30</option><option>50</option><option>60</option></select></div>
+              <div><label for="ovSize">Größe</label><select id="ovSize"><option value="1">für 1080p</option><option value="2" selected>für 4K</option></select></div>
+              <div id="ovScopeWrap"><label for="ovScope">Zählen ab</label><select id="ovScope"><option value="tour">Tourstart</option><option value="stage">Tagesstart</option></select></div>
+              <div class="wide"><label for="ovPlace">Ort am Startpunkt</label><input id="ovPlace" type="text" autocomplete="off"></div>
+            </div>
+          </details>
+
+          <details class="group" open>
+            <summary>Inhalt</summary>
+            <div class="sublabel">Werte <span class="hint">– Reihenfolge durch Ziehen oder Alt + Pfeiltaste ändern</span></div>
+            <div class="chips" id="ovChecks"></div>
+            <div class="sublabel">Elemente</div>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="ovMap" checked>Karte</label>
+              <label class="chip"><input type="checkbox" id="ovProfile" checked>Höhenprofil</label>
+              <label class="chip"><input type="checkbox" id="ovBox" checked>Hintergrund</label>
+            </div>
+            <div class="grid">
+              <div><label for="ovDec">Kilometer</label><select id="ovDec"><option value="2">12,34</option><option value="1">12,3</option></select></div>
+              <div><label for="ovClock">Uhrzeit</label><select id="ovClock"><option value="1">14:35:07</option><option value="0">14:35</option></select></div>
+            </div>
+          </details>
+
+          <details class="group">
+            <summary>Layout</summary>
+            <div class="grid">
+              <div><label for="ovLayout">Anordnung</label><select id="ovLayout"><option value="list">Liste</option><option value="bar">Leiste</option></select></div>
+              <div><label for="ovWidth">Breite (px bei 1080p)</label><input id="ovWidth" type="number" min="120" step="10" placeholder="auto"></div>
+              <div class="wide"><label for="ovMapPos">Karte</label><select id="ovMapPos"><option value="top">über den Werten</option><option value="bottom">unter den Werten</option><option value="side">links daneben (so hoch wie die Werte)</option></select></div>
+            </div>
+          </details>
+
+          <details class="group">
+            <summary>Schrift</summary>
+            <div class="grid">
+              <div><label for="ovFont">Schriftart</label><select id="ovFont">
+                <option>Open Sans</option><option>Roboto</option><option>Inter</option><option>Montserrat</option><option>Barlow</option><option>Barlow Condensed</option><option>Oswald</option>
+              </select></div>
+              <div><label for="ovWeight">Schnitt</label><select id="ovWeight">
+                <option value="300">Light</option><option value="400">Regular</option><option value="500">Medium</option>
+                <option value="600">SemiBold</option><option value="700" selected>Bold</option><option value="800">ExtraBold</option>
+                <option value="c400">Condensed Regular</option><option value="c600">Condensed SemiBold</option><option value="c700">Condensed Bold</option>
+              </select></div>
+              <div><label for="ovScale">Textgröße (%)</label><input id="ovScale" type="number" min="50" max="300" step="5" value="100"></div>
+            </div>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="ovLabels" checked>Beschriftungen</label>
+              <label class="chip"><input type="checkbox" id="ovUpper">Großbuchstaben</label>
+            </div>
+          </details>
+
+          <details class="group">
+            <summary>Farben &amp; Hintergrund</summary>
+            <div class="grid">
+              <div><label for="ovAccent">Akzent</label><input id="ovAccent" type="color" value="#ff6a1a"></div>
+              <div><label for="ovText">Text</label><input id="ovText" type="color" value="#ffffff"></div>
+              <div><label for="ovBase">Strecke</label><input id="ovBase" type="color" value="#ffffff"></div>
+              <div><label for="ovBgCol">Hintergrund</label><input id="ovBgCol" type="color" value="#0c1014"></div>
+              <div><label for="ovBgAlpha">Deckkraft (%)</label><input id="ovBgAlpha" type="number" min="0" max="100" step="5" value="55"></div>
+              <div><label for="ovRadius">Ecken (px)</label><input id="ovRadius" type="number" min="0" max="60" step="1" value="14"></div>
+            </div>
+            <div class="chips"><label class="chip"><input type="checkbox" id="ovShadow" checked>Schatten</label></div>
+          </details>
+
+          <details class="group">
+            <summary>Karte</summary>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="ovTiles">Kartenhintergrund</label>
+              <label class="chip"><input type="checkbox" id="ovAttr" checked>© in der Karte</label>
+              <button class="info" data-help="ovTilesHelp" aria-expanded="false" title="Datenschutz und Quellenangabe">?</button>
+            </div>
+            <div class="hint" id="ovTilesHelp" hidden>Der Kartenhintergrund lädt Kacheln von OpenStreetMap; der Kartenserver erfährt dabei den Kartenausschnitt. Die Quellenangabe „© OpenStreetMap“ ist Pflicht: entweder klein in der Karte oder an anderer Stelle im Video, z. B. im Abspann oder in der Beschreibung.</div>
+            <div class="grid">
+              <div><label for="ovTileStyle">Kartenstil</label><select id="ovTileStyle"><option value="dark">dunkel</option><option value="light">hell</option><option value="color">farbig</option></select></div>
+              <div><label for="ovTileAlpha">Deckkraft (%)</label><input id="ovTileAlpha" type="number" min="0" max="100" step="5" value="45"></div>
+              <div><label for="ovMapH">max. Höhe (px)</label><input id="ovMapH" type="number" min="60" max="1000" step="10" value="220"></div>
+              <div><label for="ovLine">Linie (px)</label><input id="ovLine" type="number" min="1" max="12" step="0.5" value="3"></div>
+            </div>
+          </details>
+
+          <details class="group" id="ovDesign">
+            <summary>Vorlage</summary>
+            <p class="hint">Speichert die Gestaltung – Inhalt, Layout, Schrift, Farben und Karte – als JSON-Datei. Die Angaben unter „Clip“ bleiben unverändert. Eine Vorlage lässt sich auch einfach auf die Seite ziehen.</p>
+            <input id="ovDesignName" type="text" placeholder="Name der Vorlage" autocomplete="off" aria-label="Name der Vorlage">
+            <div class="btnrow">
+              <button id="ovDesignSave">Speichern</button>
+              <button id="ovDesignLoad">Laden</button>
+              <button id="ovDesignReset" title="Gestaltung auf die Ausgangswerte zurücksetzen">Standard</button>
+            </div>
+            <input id="ovDesignFile" type="file" accept=".json,application/json" hidden>
+            <div class="hint" id="ovDesignMsg" role="status"></div>
+          </details>
+        </div>
+
+        <div class="stage-col">
+          <div class="card preview-card">
+            <div class="exports">
+              <button id="ovZip" class="primary">PNG-Sequenz speichern (ZIP)</button>
+              <button id="ovPng">Einzelbild (PNG)</button>
+              <button id="ovAll" title="Je eigenem Punkt eine Sequenz ab diesem Punkt, alle in einem ZIP">Alle eigenen Punkte (ZIP)</button>
+            </div>
+            <div class="hint" id="ovProg" role="status"></div>
+            <div class="ovpreview"><canvas id="ovCanvas"></canvas></div>
+            <div class="player">
+              <button id="ovPlay" class="icon" title="Vorschau abspielen" aria-label="Vorschau abspielen">▶</button>
+              <input id="ovSlider" type="range" min="0" max="10" step="any" value="0" aria-label="Zeitpunkt im Clip">
+              <span id="ovTime"></span>
+            </div>
+            <div class="hint" id="ovInfo" role="status"></div>
+            <details class="more">
+              <summary>So kommt das Overlay in Premiere Pro</summary>
+              <p>ZIP entpacken, „Datei › Importieren“, das erste Bild auswählen und „Bildsequenz“ anhaken. Der Hintergrund ist transparent. Stimmt die Länge nicht, die Framerate über „Ändern › Filmmaterial interpretieren“ auf den Wert unter „Clip“ setzen.</p>
+              <p>„Alle eigenen Punkte“ erzeugt für jeden Eintrag aus „Eigene Punkte“ eine Sequenz mit diesen Einstellungen, jede in einem eigenen Ordner.</p>
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Story-Creator -->
+    <section id="panel-story" class="panel" role="tabpanel" aria-labelledby="tab-story" hidden>
+      <div class="studio" id="pcCard">
+        <div class="settings">
+          <details class="group" open>
+            <summary>Format &amp; Inhalt</summary>
+            <div class="grid">
+              <div><label for="pcFormat">Format</label><select id="pcFormat"><option value="story">Story 9:16</option><option value="post" selected>Beitrag 4:5</option><option value="square">Quadrat 1:1</option></select></div>
+              <div><label for="pcLayout">Anordnung</label><select id="pcLayout"><option value="big">Strecke groß</option><option value="bottom">alles unten</option></select></div>
+              <div class="wide" id="pcScopeWrap"><label for="pcScope">Abschnitt</label><select id="pcScope"></select></div>
+              <div class="wide"><label for="pcTitle">Titel</label><input id="pcTitle" type="text" placeholder="optional" autocomplete="off"></div>
+            </div>
+            <div class="chips" id="pcChecks"></div>
+          </details>
+
+          <details class="group" open>
+            <summary>Hintergrund</summary>
+            <div class="grid">
+              <div><label for="pcBg">Hintergrund</label><select id="pcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color">Farbe</option></select></div>
+              <div><label for="pcBgCol">Farbe</label><input id="pcBgCol" type="color" value="#14181d"></div>
+              <div><label for="pcDim">Foto abdunkeln (%)</label><input id="pcDim" type="number" min="0" max="90" step="5" value="45"></div>
+              <div class="wide"><button id="pcPhotoBtn" type="button">Foto wählen …</button><input id="pcPhoto" type="file" accept="image/*" hidden></div>
+            </div>
+            <div class="hint">„Transparent“ ergibt einen Sticker, den du in der App über ein eigenes Foto oder Video legst. Ein Foto lässt sich auch einfach auf die Seite ziehen; es wird nur im Browser verarbeitet.</div>
+          </details>
+
+          <details class="group">
+            <summary>Schrift &amp; Farben</summary>
+            <div class="grid">
+              <div><label for="pcFont">Schriftart</label><select id="pcFont"></select></div>
+              <div><label for="pcAccent">Akzent</label><input id="pcAccent" type="color" value="#ff6a1a"></div>
+              <div><label for="pcText">Text</label><input id="pcText" type="color" value="#ffffff"></div>
+            </div>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="pcItalic">Kursiv</label>
+              <label class="chip"><input type="checkbox" id="pcUpper">Großbuchstaben</label>
+            </div>
+          </details>
+        </div>
+
+        <div class="stage-col">
+          <div class="card preview-card">
+            <div class="exports">
+              <button id="pcSave" class="primary">PNG speichern</button>
+              <button id="pcShare" hidden>Teilen …</button>
+            </div>
+            <div class="pcpreview"><canvas id="pcCanvas" aria-label="Vorschau des Story-Bilds"></canvas></div>
+            <div class="hint" id="pcInfo" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tageskarte -->
+    <section id="panel-daycard" class="panel" role="tabpanel" aria-labelledby="tab-daycard" hidden>
+      <div class="studio wide-preview" id="dcCard">
+        <div class="settings">
+          <details class="group" open>
+            <summary>Karte &amp; Texte</summary>
+            <div class="grid">
+              <div class="wide"><label for="dcLayout">Anordnung</label><select id="dcLayout"><option value="split" selected>Zahlen links, Strecke rechts</option><option value="center">Titel mittig, Zahlen unten</option><option value="map">Strecke groß, Leiste unten</option></select></div>
+              <div><label for="dcRes">Auflösung</label><select id="dcRes"><option value="4k" selected>3840 × 2160</option><option value="hd">1920 × 1080</option></select></div>
+              <div id="dcScopeWrap"><label for="dcScope">Abschnitt</label><select id="dcScope"></select></div>
+              <div class="wide"><label for="dcTitle">Titel</label><input id="dcTitle" type="text" placeholder="optional" autocomplete="off"></div>
+              <div class="wide"><label for="dcSub">Untertitel</label><input id="dcSub" type="text" placeholder="z. B. Via Claudia Augusta" autocomplete="off"></div>
+              <div><label for="dcFrom">Start</label><input id="dcFrom" type="text" autocomplete="off"></div>
+              <div><label for="dcTo">Ziel</label><input id="dcTo" type="text" autocomplete="off"></div>
+            </div>
+            <div class="btnrow" style="margin-top:10px"><button id="dcPlaces" type="button" class="small" hidden>Start und Ziel abrufen</button><span class="hint" id="dcPlaceProg" role="status"></span></div>
+            <div class="hint">Start und Ziel kommen aus der Tabelle. „Start und Ziel abrufen“ sendet nur die Koordinaten von Start und Ziel jeder Etappe an OpenStreetMap (Nominatim). Die Felder überschreiben die Namen nur für diese Karte.</div>
+          </details>
+
+          <details class="group" open>
+            <summary>Inhalt</summary>
+            <div class="chips" id="dcChecks"></div>
+            <div class="hint">Höchstens vier Kennzahlen; sind mehr angehakt, erscheinen die ersten vier.</div>
+          </details>
+
+          <details class="group">
+            <summary>Hintergrund</summary>
+            <div class="grid">
+              <div><label for="dcBg">Hintergrund</label><select id="dcBg"><option value="none">transparent</option><option value="photo">Foto</option><option value="color" selected>Farbe</option></select></div>
+              <div><label for="dcBgCol">Farbe</label><input id="dcBgCol" type="color" value="#14181d"></div>
+              <div><label for="dcDim">Foto abdunkeln (%)</label><input id="dcDim" type="number" min="0" max="90" step="5" value="45"></div>
+              <div class="wide"><button id="dcPhotoBtn" type="button">Foto wählen …</button><input id="dcPhoto" type="file" accept="image/*" hidden></div>
+            </div>
+            <div class="hint">„Transparent“ ergibt eine Ebene, die du in Premiere über das Video legst. Das Foto wird nur im Browser verarbeitet.</div>
+          </details>
+
+          <details class="group">
+            <summary>Schrift &amp; Farben</summary>
+            <div class="grid">
+              <div><label for="dcFont">Schriftart</label><select id="dcFont"></select></div>
+              <div><label for="dcAccent">Akzent</label><input id="dcAccent" type="color" value="#ff6a1a"></div>
+              <div><label for="dcText">Text</label><input id="dcText" type="color" value="#ffffff"></div>
+            </div>
+            <div class="chips">
+              <label class="chip"><input type="checkbox" id="dcItalic">Kursiv</label>
+              <label class="chip"><input type="checkbox" id="dcUpper">Großbuchstaben</label>
+            </div>
+          </details>
+        </div>
+
+        <div class="stage-col">
+          <div class="card preview-card">
+            <div class="exports">
+              <button id="dcSave" class="primary">PNG speichern</button>
+              <button id="dcZip" hidden title="Eine Karte je Etappe; Titel, Start und Ziel aus den Feldern gelten nur für den gewählten Tag">Alle Tage als ZIP</button>
+            </div>
+            <div class="pcpreview"><canvas id="dcCanvas" aria-label="Vorschau der Tageskarte"></canvas></div>
+            <div class="hint" id="dcInfo" role="status"></div>
+          </div>
+        </div>
+      </div>
+    </section>
   </div>
 </main>
+<div class="dropveil" aria-hidden="true"><div>Dateien hier ablegen</div></div>
 
 <script src="js/util.js"></script>
 <script src="js/parse.js"></script>

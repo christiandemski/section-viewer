@@ -214,7 +214,8 @@ const RACE_MARKS = [[5000, '5 km'], [10000, '10 km'], [21097.5, 'Halbmarathon'],
 
 function update() {
   const T = state.track, S = state.stages;
-  $('app').hidden = !T;
+  $('app').hidden = $('topActions').hidden = $('tabRow').hidden = !T;
+  $('start').hidden = !!T;
   if (!T) return;
   const anyDevice = S.some(hasDeviceAscent);
   const auto = state.auto && anyDevice;
@@ -268,6 +269,7 @@ function update() {
   });
   state.rows = rows;
   $('customErr').textContent = bad.length ? 'Nicht erkannt oder außerhalb der Tour: ' + bad.join('  ') : '';
+  $('custom').setAttribute('aria-invalid', bad.length > 0);
 
   renderSummary();
   renderChart();
