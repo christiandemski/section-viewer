@@ -177,6 +177,8 @@ input[type=color]{width:100%;height:36px;padding:3px;background:var(--surface);b
 .chips>.ovf{cursor:grab}
 .chips>.ovf::before{content:"⋮⋮";font-size:10px;letter-spacing:-2px;color:var(--muted);margin-right:-2px}
 .chips>.drag{opacity:.4}
+.chips>.ovf{-webkit-touch-callout:none}
+.chips.sorting>.drag{opacity:1;outline:2px solid var(--accent);outline-offset:2px;transform:scale(1.06)}
 #ovDesignName{margin-top:10px}
 #ovDesign .btnrow{margin-top:8px}
 

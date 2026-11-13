@@ -74,8 +74,61 @@ function makeSortable(box, sel, done) {
     drag = null;
     done();
   });
+  // Touch: kurz gedrückt halten hebt den Chip an, dann ziehen. HTML5-Drag gibt es auf Touchgeräten meist nicht.
+  // Wer vor Ablauf der Haltezeit wischt, scrollt ganz normal.
+  let touch = null;
+  const endTouch = moved => {
+    if (!touch) return;
+    clearTimeout(touch.timer);
+    if (touch.active) {
+      touch.item.classList.remove('drag');
+      box.classList.remove('sorting');
+      // der Klick nach dem Loslassen würde sonst die Checkbox umschalten
+      const eat = e => { e.preventDefault(); e.stopPropagation(); };
+      box.addEventListener('click', eat, {capture: true, once: true});
+      setTimeout(() => box.removeEventListener('click', eat, {capture: true}), 400);
+      if (moved) {
+        const all = [...box.querySelectorAll(sel)];
+        announce(`${touch.item.textContent.trim()}: Position ${all.indexOf(touch.item) + 1} von ${all.length}`);
+        done();
+      }
+    }
+    touch = null;
+  };
+  box.addEventListener('touchstart', ev => {
+    const item = ev.target.closest(sel);
+    if (!item || ev.touches.length > 1) return endTouch(false);
+    const t = ev.touches[0];
+    touch = {item, x: t.clientX, y: t.clientY, active: false, moved: false};
+    touch.timer = setTimeout(() => {
+      if (!touch) return;
+      touch.active = true;
+      item.classList.add('drag');
+      box.classList.add('sorting');
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 350);
+  }, {passive: true});
+  box.addEventListener('touchmove', ev => {
+    if (!touch) return;
+    const t = ev.touches[0];
+    if (!touch.active) {
+      if (Math.hypot(t.clientX - touch.x, t.clientY - touch.y) > 8) endTouch(false); // Scrollen
+      return;
+    }
+    ev.preventDefault();
+    const over = document.elementFromPoint(t.clientX, t.clientY)?.closest(sel);
+    if (!over || over === touch.item || over.parentNode !== box) return;
+    const rect = over.getBoundingClientRect();
+    const before = t.clientY < rect.top ? true : t.clientY > rect.bottom ? false : t.clientX < rect.left + rect.width / 2;
+    const ref = before ? over : over.nextSibling;
+    if (ref !== touch.item && ref !== touch.item.nextSibling) { box.insertBefore(touch.item, ref); touch.moved = true; }
+  }, {passive: false});
+  box.addEventListener('touchend', ev => { if (touch?.active) ev.preventDefault(); endTouch(touch?.moved); });
+  box.addEventListener('touchcancel', () => endTouch(touch?.moved));
+  box.addEventListener('contextmenu', ev => { if (touch) ev.preventDefault(); });
+
   box.addEventListener('keydown', ev => {
-    const d = {ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1}[ev.key], item = ev.target.closest(sel);
+    const d ={ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1}[ev.key], item = ev.target.closest(sel);
     if (!ev.altKey || !d || !item) return;
     ev.preventDefault();
     const sib = d < 0 ? item.previousElementSibling : item.nextElementSibling;
